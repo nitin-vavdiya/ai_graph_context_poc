@@ -70,42 +70,32 @@ restore_repo() { # $1 = repo path
 }
 
 # ---- per-task setup / canonical solution / oracle ---------------------------
-setup_task() { # $1=id
-  case "$1" in
-    C1) perl -0pi -e 's/mac\.Write\(\[\]byte\("&"\)\)/mac.Write([]byte(","))/' "$RND/cashbot-go/pkg/link/hmac.go" ;;
-    B1|A1|A2) : ;;  # no pre-seed
-  esac
+# Globals set per task in the main loop: TID TKIND TCOMMIT TCODE TPKG
+setup_task() {
+  if [ "$TKIND" = "real_commit" ]; then
+    # recreate the original bug: reverse-apply the commit's CODE change (tests kept at HEAD)
+    ( cd "$RND/cashbot-go" && git show "$TCOMMIT" -- $TCODE | git apply -R 2>/dev/null )
+  fi
+  # constructed tasks (A2) need no pre-seed
 }
-apply_solution() { # $1=id  — used only in --dry to exercise the pass path
-  case "$1" in
-    C1) perl -0pi -e 's/mac\.Write\(\[\]byte\(","\)\)/mac.Write([]byte("&"))/' "$RND/cashbot-go/pkg/link/hmac.go" ;;
-    A1) perl -0pi -e 's/json:"resultURL,omitempty"/json:"resultUri,omitempty"/' "$RND/cashbot-go/pkg/model/services/response.go" ;;
+apply_solution() { # --dry only: produce a correct solution to exercise the pass path
+  if [ "$TKIND" = "real_commit" ]; then
+    ( cd "$RND/cashbot-go" && git checkout HEAD -- $TCODE )   # restore the real shipped fix
+    return 0
+  fi
+  case "$TID" in
     A2) perl -0pi -e 's/(\tResultURL\s+\*string\s+`json:"resultURL,omitempty"`\n)/$1\tEngineVersion  *string `json:"engineVersion,omitempty"`\n/' "$RND/cashbot-go/pkg/model/services/response.go" ;;
-    B1) return 1 ;;  # too multi-file to auto-apply; dry leaves it failing
+    *) return 1 ;;
   esac
 }
-oracle() { # $1=id ; sets globals ORACLE_PASS, COMPLETENESS, NOTE
-  local id="$1" cg="$RND/cashbot-go"; ORACLE_PASS=0; COMPLETENESS=0; NOTE=""
-  case "$id" in
-    C1)
-      ( cd "$cg" && go test ./pkg/link >/dev/null 2>&1 ) && ORACLE_PASS=1
-      COMPLETENESS=$ORACLE_PASS; NOTE="go test ./pkg/link" ;;
-    B1)
-      local built=0 tested=0 behav=0 leftovers
-      ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) && built=1
-      ( cd "$cg" && go test ./pkg/config/... >/dev/null 2>&1 ) && tested=1
-      leftovers=$(grep -rn --include='*.go' '\.BaseURL()' "$cg" | grep -v _test.go | wc -l | tr -d ' ')
-      [ "$leftovers" = "0" ] && COMPLETENESS=1
-      cp "$FIX/B1_baseurl_behavior_test.go.txt" "$cg/pkg/config/zz_b1_behavior_test.go" 2>/dev/null
-      ( cd "$cg" && go test ./pkg/config >/dev/null 2>&1 ) && behav=1
-      rm -f "$cg/pkg/config/zz_b1_behavior_test.go"
-      [ "$built" = 1 ] && [ "$tested" = 1 ] && [ "$behav" = 1 ] && ORACLE_PASS=1
-      NOTE="build=$built test=$tested behavior=$behav leftover_calls=$leftovers" ;;
-    A1)
-      ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) || NOTE="build-fail"
-      if grep -q 'json:"resultUri' "$cg/pkg/model/services/response.go" && ! grep -q 'json:"resultURL' "$cg/pkg/model/services/response.go"; then COMPLETENESS=1; fi
-      ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) && [ "$COMPLETENESS" = 1 ] && ORACLE_PASS=1
-      NOTE="${NOTE} resultUri_tag=$COMPLETENESS" ;;
+oracle() { # sets globals ORACLE_PASS, COMPLETENESS, NOTE
+  local cg="$RND/cashbot-go"; ORACLE_PASS=0; COMPLETENESS=0; NOTE=""
+  if [ "$TKIND" = "real_commit" ]; then
+    ( cd "$cg" && go test $TPKG >/dev/null 2>&1 ) && ORACLE_PASS=1
+    COMPLETENESS=$ORACLE_PASS; NOTE="go test $TPKG"
+    return
+  fi
+  case "$TID" in
     A2)
       grep -q 'json:"engineVersion' "$cg/pkg/model/services/response.go" && COMPLETENESS=1
       ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) && [ "$COMPLETENESS" = 1 ] && ORACLE_PASS=1
@@ -198,6 +188,12 @@ for i in $(seq 0 $((NTASK-1))); do
   run_dir=$(jq -rs ".[$i].run_dir" "$TASKS")
   prompt=$(jq -rs ".[$i].prompt" "$TASKS")
   repos=( $(jq -rs ".[$i].repos[]" "$TASKS") )
+  # per-task globals used by setup_task / apply_solution / oracle
+  TID="$id"
+  TKIND=$(jq -rs ".[$i].kind // \"constructed\"" "$TASKS")
+  TCOMMIT=$(jq -rs ".[$i].commit // \"\"" "$TASKS")
+  TCODE=$(jq -rs ".[$i].code_files // [] | join(\" \")" "$TASKS")
+  TPKG=$(jq -rs ".[$i].test_pkg // \"\"" "$TASKS")
   wants "$id" "$ONLY_TASKS" || continue
   add=(); for r in "${repos[@]}"; do add+=(--add-dir "$RND/$r"); done
 
@@ -207,12 +203,12 @@ for i in $(seq 0 $((NTASK-1))); do
     echo "  boundary: built-in tools ALLOWED | MCP=$([ -n "$(arm_mcp "$arm")" ] && basename "$(arm_mcp "$arm")" || echo none) | add-dir=${repos[*]}"
 
     restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"
-    setup_task "$id"
+    setup_task
 
     cell="$OUT/${id}_${arm}"; log="$cell.jsonl"; : > "$log"
     if [ "$DRY" = 1 ]; then
       echo "  [dry] skipping Claude; applying canonical solution"
-      apply_solution "$id" || echo "  [dry] no auto-solution for $id (oracle expected to fail)"
+      apply_solution || echo "  [dry] no auto-solution for $id (oracle expected to fail)"
       IS_ERROR=dry; NUM_TURNS=0; IN_TOK=0; OUT_TOK=0; CACHE=0; DUR=0; COST=0; TOOLS=0; MCPTOOLS=0
     else
       mcp="$(arm_mcp "$arm")"; mcpflag=(); [ -n "$mcp" ] && mcpflag=(--mcp-config "$mcp")
@@ -221,7 +217,7 @@ for i in $(seq 0 $((NTASK-1))); do
       parse_metrics "$log"
     fi
 
-    oracle "$id"
+    oracle
     ts=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo dry)
     echo "$ts,$id,$arm,$IS_ERROR,$ORACLE_PASS,$COMPLETENESS,$TOOLS,$MCPTOOLS,$NUM_TURNS,$IN_TOK,$OUT_TOK,$CACHE,$DUR,$COST" >> "$RESULTS"
     echo "  result: is_error=$IS_ERROR oracle_pass=$ORACLE_PASS completeness=$COMPLETENESS tools=$TOOLS(mcp=$MCPTOOLS) turns=$NUM_TURNS tokens=$IN_TOK/$OUT_TOK  [$NOTE]"

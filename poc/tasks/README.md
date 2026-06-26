@@ -1,80 +1,80 @@
 # Benchmark Task Definition
 
-What we run the 4 arms (baseline / CGC / Serena / both — see [`../benchmark-design.md`](../benchmark-design.md) §4.1) against. Start with **4 tasks** (one per scenario, plus an easy/hard pair for cross-repo) to validate the whole harness end-to-end, then expand. Oracle = run the repo's own tests (design §4.4); isolation per design §4.5; metrics per `../../docs/research/context-graph-evaluation.md` §3.6.
+What we run the 4 arms (baseline / CGC / Serena / both — see [`../benchmark-design.md`](../benchmark-design.md) §4.1) against. The corpus is **3 real historical bugfixes** replayed from `cashbot-go`'s git history, plus **1 constructed cross-repo task** (A2) for the graph thesis. Oracle = run the repo's own tests (design §4.4); isolation per design §4.5; metrics per [`../../docs/research/context-graph-evaluation.md`](../../docs/research/context-graph-evaluation.md) §3.6.
 
-## Why these repos
+## Why real commits
 
-The oracle is "run tests", so tasks live where tests run green locally (verified 2026-06-26):
+Earlier drafts used synthetic tasks (seed-a-bug, mechanical refactor, hypothetical field renames). They were replaced with **actual shipped commits** so the corpus reflects real development work, scored by the developers' own tests — the SWE-bench method.
 
-- **cashbot-go** — builds clean (go 1.26.3); `pkg/formatter*`, `pkg/link`, `pkg/config` test **green** with no external services. The testable hub → scenarios B and C live here.
-- **ai-server** — has tests but Detectron2/GPU deps make local runs risky → used only as the *source* end of the cross-repo task (scenario A), scored by completeness, not by running its tests.
+**Replay method (per real task):**
+
+1. Pick a real commit that fixed a bug/added behavior *and shipped with a test*, in a package that builds + tests green locally with no external services.
+2. **Setup:** reverse-apply the commit's **code** change at HEAD (`git show <sha> -- <code_files> | git apply -R`) — this recreates the original bug. The commit's **test stays at HEAD** (the spec).
+3. **Prompt:** the symptom/requirement (not the fix).
+4. **Oracle:** the package's `go test` goes red→green.
+
+Each candidate is vetted: no drift since the commit, reverse-apply is clean, and the test is verified to go RED after reverse and GREEN after restore.
+
+## Repos
+
+Oracle is "run tests", so tasks live where tests run green locally (verified 2026-06-26):
+
+- **cashbot-go** — builds (go 1.26.3); the real-commit tasks live in packages that test green with no services (`pkg/partner/partners/groundx`, `pkg/mcp`).
+- **ai-server** — GPU/Detectron2 deps make local test runs unreliable → used only as the *source* end of the cross-repo task (A2), scored by completeness, not by running its tests.
+
+## The corpus
+
+| # | Kind | Task (symptom given to the agent) | Real commit | Oracle | Stresses |
+|---|---|---|---|---|---|
+| **R1** | real bugfix | Partner MCP tool executions sometimes fail to decode the response (`failed to parse MCP execution response`) — fix it | `2548ec43` *Fix MCP execution response decoding* | `go test ./pkg/partner/partners/groundx` | Time (find) |
+| **R2** | real bugfix | Partner accounts are exposed a shadowed customer MCP tool — hide it for partners | `5be28304` *Hide shadowed customer MCP tool for partners* | `go test ./pkg/mcp` | Quality |
+| **R3** | real bugfix | Valid OAuth token requests wrongly rejected `invalid_grant` on resource-URL mismatch — fix normalization | `618633ec` *oauth fixes* | `go test ./pkg/partner/partners/groundx` | Time (find) |
+| **A2** | constructed | ai-server adds webhook field `engineVersion`; find the consuming service and add it | — (service-level coupling; no single-commit equivalent) | `go build ./pkg/...` + field present | Time (cross-repo find) |
+
+All three real bugfixes were verified red→green on 2026-06-26. A2 is kept constructed because a genuine cross-repo change does not land as one commit with one test suite (the coupling is service-level) — it is the graph discriminator: `engineVersion` is absent from cashbot-go (not greppable), so the agent must trace ai-server → cashbot-go.
 
 ## Task schema (`tasks.jsonl`, one JSON object per line)
 
 ```json
 {
-  "id": "A1",
-  "scenario": "cross_repo_blast_radius | in_repo_impact | locate_and_fix",
-  "repos": ["cashbot-go", "ai-server"],
+  "id": "R1",
+  "kind": "real_commit | constructed",
+  "scenario": "bugfix | cross_repo_blast_radius",
+  "repos": ["cashbot-go"],
   "run_dir": "groundx-rnd/cashbot-go",
-  "prompt": "the exact instruction given to the agent — identical across all 4 arms",
-  "setup": "git/precondition steps to reach a known green baseline (e.g. apply a seeded bug)",
-  "oracle": {
-    "test_cmd": ["go test ./pkg/formatter/..."],
-    "must_change": ["file:symbol that a correct edit must touch"],
-    "regression_cmd": ["go test ./..."]
-  },
-  "stresses": "cost | time | quality",
-  "ground_truth_notes": "what a correct, complete change looks like (for human rating)"
+  "commit": "2548ec43",                       // real_commit only
+  "code_files": ["pkg/.../mcp.go"],            // real_commit only: reverse-applied at setup
+  "test_pkg": "./pkg/partner/partners/groundx",
+  "prompt": "the symptom/requirement — identical across all 4 arms",
+  "oracle": { "test_cmd": ["..."], "regression_cmd": ["..."] },
+  "stresses": "time | quality | cost",
+  "source": "...", "ground_truth_notes": "..."
 }
 ```
 
-`prompt` is **identical across arms** — only the available tools differ. `run_dir` is where `claude -p` is launched (Serena activates the repo from cwd).
-
-## The three scenarios
-
-| Scenario | Task shape | Oracle | Metric stressed | Expected arm ordering (hypothesis) |
-|---|---|---|---|---|
-| **A. cross-repo blast-radius** | A field in ai-server's layout webhook payload is renamed/added; update the cashbot-go consumer to match | completeness (found + edited the correct cashbot-go struct/handler) + cashbot-go tests for that area if green; **ai-server tests not run** | Quality (completeness), Cost | CGC / both > baseline > Serena (can't span) |
-| **B. in-repo impact** | Change an exported function's signature in a green cashbot-go package; update every call site | `go test` on affected packages must pass + all call sites updated | Quality, Cost | CGC / Serena / both > baseline |
-| **C. locate-and-fix** | A seeded one-line bug fails an existing test; "tests in pkg X fail — find and fix" | the package's `go test` goes red→green | Time, Cost (find-cost) | tools > baseline if structure beats grep |
-
-**Honesty on A:** its downstream end (ai-server) may not build locally, so A is scored mainly on completeness + "did it find the right repo/file" + cost/time, with test-pass only on the cashbot-go end. B and C run entirely in cashbot-go for an airtight `go test` oracle.
+`prompt` is **identical across arms** — only the available tools differ. The runner reads `kind`/`commit`/`code_files`/`test_pkg` to drive setup and the oracle generically.
 
 ## Scoring per run
 
-- **Correctness** — oracle `test_cmd` exit 0 (and `regression_cmd` still green).
-- **Completeness** — every entry in `must_change` actually changed (and no required call site missed).
-- **Cost** — `usage` input+output (and cache) tokens from the JSON result.
-- **Time** — `num_turns` / tool-call count (from stream-json `tool_use` events) + `duration_ms`.
-- **Outcome** — `is_error`, plus pass/fail of correctness + completeness.
+- **Correctness** — oracle `test_cmd` exit 0 (and `regression_cmd` green).
+- **Completeness** — for real tasks, equal to test-pass; for A2, the new field is present.
+- **Cost** — `usage` input+output (and cache) tokens from the run JSON.
+- **Time** — `num_turns` / tool-call count (stream-json `tool_use` events) + `duration_ms`.
+- **Outcome** — `is_error` + pass/fail.
 
-Each task runs once per arm (4 runs/task); record raw JSON per run for audit.
+Each task runs once per arm (4 runs/task); raw JSON per run kept for audit.
 
-## Harness-validation goal (the "start tiny" step)
+## Oracle facts established
 
-Before scaling the corpus: run all 4 tasks × 4 arms once (16 runs), confirm the runner (a) applies setup/green baseline, (b) launches each arm with the right isolation flags, (c) captures tokens/turns/is_error, (d) runs the oracle and records pass/fail, (e) restores the repo to clean state between runs. Only once that loop is trustworthy do we expand to ~2–3 tasks per scenario.
+- cashbot-go builds (go 1.26.3). Real-task packages (`pkg/partner/partners/groundx`, `pkg/mcp`) test green with no services. `go build ./...` (whole repo) is **not** green (needs `go generate`) → A2 uses `go build ./pkg/...`.
+- Webhook decode path (A2): `lambda/DocumentLayoutWebhook/main.go` wires `documentlayout.Handler`; the JSON unmarshal into `services.Response` is at `pkg/processor/documentlayout/handler.go:148`; struct at `pkg/model/services/response.go:16`.
 
 ## Runner (`../run.sh`)
 
 ```bash
-bash poc/run.sh --dry                  # validate plumbing, no Claude calls (applies canonical fixes)
-bash poc/run.sh --tasks C1 --arms baseline   # one real cell
-bash poc/run.sh                        # full matrix: 4 tasks × 4 arms = 16 real runs
+bash poc/run.sh --dry                          # validate plumbing, no Claude calls
+bash poc/run.sh --tasks R1 --arms baseline     # one real cell
+bash poc/run.sh                                # full matrix: 4 tasks × 4 arms
 ```
 
-Per cell it: snapshots the repo (git stash-create — preserves pre-existing local state like a modified `AGENTS.md` and untracked `documents-latest/`), applies the task setup (e.g. seeds the C1 bug), launches Claude with that arm's isolation flags + MCP config, parses `usage`/turns/tool-calls/`is_error` from the stream-json log, runs the oracle (tests/build/completeness, plus the B1 behavior fixture), appends a row to `results/results.csv`, and restores the repo. Validated 2026-06-26: dry run (pass+fail paths) and one real cell (C1/baseline — the agent found and fixed the seeded bug). Raw per-cell logs and `results/` are gitignored (they contain groundx-rnd code snippets).
-
-## Concrete tasks (3 — grounded + verified 2026-06-26)
-
-See `tasks.jsonl`. All anchors are real symbols in green-testing code.
-
-- **C1 — locate-and-fix (call-chain).** Seed a one-line bug in a *deep callee*: `pkg/link/hmac.go:calcHmac` (flip the `"&"` separator to `","`). Task = "`go test ./pkg/link` fails, find & fix". The failing test (`TestIsValid`/`ExampleRec_link_simple`) is in `link_test.go`; the cause is in a **different file** (`hmac.go`) reached via `IsValid → calcHmac`, and the symptom (wrong HMAC digest) never names `calcHmac` → the agent must trace the call chain (CGC `call_chain` / Serena go-to-def vs blind grep). Oracle `go test ./pkg/link` red→green. **Verified.**
-- **B1 — in-repo impact.** Add a `secure bool` param to `(Upload).BaseURL()` (`pkg/config/upload.go:34`) and update **all ~20 call sites**. Oracle = `go build ./pkg/...` (green) + `go test ./pkg/config/...` + completeness via `grep '\.BaseURL()'` == 0 + a **behavior fixture** (`fixtures/B1_baseurl_behavior_test.go.txt`, injected post-edit) asserting the https/http scheme. Tests find-all-references vs grep.
-- **A1 — cross-repo (easy/greppable control).** ai-server renames webhook field `resultURL`→`resultUri`; update the cashbot-go consumer (`pkg/model/services/response.go:Response.ResultURL` JSON tag). Oracle = completeness on the tag + `go build ./pkg/...`. The shared field name is greppable, so we **expect arms to roughly tie** — this validates the cross-repo harness and measures cost.
-- **A2 — cross-repo (hard/relational discriminator).** ai-server *adds* a new field `engineVersion`; find the consuming service and add the field to its `Response` struct. The new name is **absent from cashbot-go (verified 0 hits) → not greppable there**, so the agent must trace the service relationship (ai-server layout webhook → cashbot-go). CGC's `CALLS_SERVICE` edge answers directly; baseline must infer (callbackURL → api.groundx.ai = cashbot-go); Serena can't span repos. Oracle = `Response` has the new field + `go build ./pkg/...`. **A1 vs A2 contrast = where the graph helps vs where grep already suffices.**
-
-### Oracle facts established
-- cashbot-go builds (go 1.26.3); `go build ./pkg/...` is green. (`go build ./...` is **not** — `lambda/*` & some `cmd/*` need `go generate` first; avoid whole-repo build as an oracle.)
-- Green test packages with no external services: `pkg/formatter*`, `pkg/link`, `pkg/config`. (`pkg/copy`, `pkg/files` need a config file — excluded.)
-- Webhook decode path (for A1/A2): `lambda/DocumentLayoutWebhook/main.go` wires `documentlayout.Handler`; the JSON unmarshal into `services.Response` is at `pkg/processor/documentlayout/handler.go:148`; struct at `pkg/model/services/response.go:16`.
+Per cell it snapshots the repo (preserving pre-existing local state), applies the task setup (reverse-applies the real commit for R-tasks), launches Claude with that arm's isolation flags + MCP config, parses `usage`/turns/tool-calls/`is_error`, runs the oracle, appends to `results/results.csv`, generates `runs/<TASK>.md`, and restores. Raw logs + `results/` are gitignored (groundx-rnd code). Validated 2026-06-26 (dry: all 4 pass; real cell proven earlier).

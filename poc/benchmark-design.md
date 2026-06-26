@@ -85,9 +85,12 @@ Four ways of giving Claude Code the **same** task, then compared on tokens, step
 3. **Serena — Claude + a language-server.** Same Claude, using IDE-grade "go to definition / find usages" — precise *inside* one repo, but it sees only one repo at a time, so on cross-repo tasks it cannot follow the trail. **Reported as a documented limit, not scored as a failure. MCP: serena only — must not see CGC.**
 4. **Both — Claude + graph + language-server.** Same Claude with *both* tools available, to test whether they are complementary (graph for cross-repo routing, LSP for in-repo precision) and beat either alone. **MCP: codegraphcontext + serena, nothing else.**
 
-### 4.2 Task shape (cross-repo)
+### 4.2 Task corpus
 
-A change that originates in one repo and must ripple to another along a known C4 edge. Canonical example: rename/extend a field in `ai-server`'s layout webhook payload (`DocumentLayoutWebhook`); the correct change also updates the consumer in `cashbot-go`. Success = both repos' relevant tests pass and the consumer was actually updated (completeness).
+The concrete corpus and its schema live in [`tasks/README.md`](tasks/README.md) ([`tasks/tasks.jsonl`](tasks/tasks.jsonl)). It is **3 real historical bugfixes** replayed from `cashbot-go` (the SWE-bench method: reverse-apply the commit's code to recreate the bug, the commit's own test is the oracle) **plus 1 constructed cross-repo task** (A2) for the graph thesis.
+
+- **Real in-repo tasks (R1–R3)** — genuine shipped fixes (MCP response decoding, hiding a shadowed partner tool, OAuth resource-URL normalization). Success = the package's `go test` goes red→green. These stress finding the right code in a large repo.
+- **Constructed cross-repo task (A2)** — a change that originates in `ai-server`'s layout webhook payload and must ripple to its consumer in `cashbot-go` (add field `engineVersion`). A genuine cross-repo change does not land as one commit with one test suite (the coupling is service-level), so this one is constructed. The new field is absent from cashbot-go (not greppable) → the agent must trace the service relationship; success = the consumer struct gains the field and `go build ./pkg/...` passes.
 
 ### 4.3 Metrics (from §3.6)
 
