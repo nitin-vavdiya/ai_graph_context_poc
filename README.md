@@ -60,4 +60,4 @@ Research-and-decision stage complete. **PoC tools finalized: CodeGraphContext + 
 
 **Phase 0 done** — cross-repo linkage. Indexing alone produced zero cross-repo edges (the real coupling is service-level, not in source); [`poc/enrich/enrich.py`](poc/enrich/enrich.py) loads the C4 `workspace.dsl` into the graph as repo-level `CALLS_SERVICE` edges, verified through Claude Code.
 
-**Next (Phase 1):** the 3-arm code-change benchmark — design in [`docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md`](docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md). Gated on per-repo test-suite buildability (§4.4); ai-server's Detectron2/GPU deps are the open risk to probe first.
+**Next (Phase 1):** the 4-arm code-change benchmark (baseline / CGC / Serena / both) — design in [`docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md`](docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md). Arm isolation is verified ([`poc/dryrun-isolation.sh`](poc/dryrun-isolation.sh), all arms pass). Gated on per-repo test-suite buildability (§4.4); ai-server's Detectron2/GPU deps are the open risk to probe first.

@@ -112,7 +112,7 @@ A live check of the populated graph found it could not answer any cross-repo que
 
 - Neo4j container `cgc-neo4j` running (graph persisted in a Docker volume); enriched with 4 cross-repo `CALLS_SERVICE` edges.
 - Both tools installed via `uv tool`; MCP config files under `poc/mcp/`.
-- Ready for the benchmark phase (3 arms: baseline / Serena / CodeGraphContext) — gated on per-repo test-suite buildability (see design doc §4.4).
+- Ready for the benchmark phase (4 arms: baseline / CGC / Serena / both) — arm isolation verified via `poc/dryrun-isolation.sh`; gated on per-repo test-suite buildability (see design doc §4.4–4.5).
 
 ## 7. Reproduce / teardown
 
@@ -123,4 +123,4 @@ See [`SETUP.md`](SETUP.md) for exact commands. Teardown: `docker compose -f poc/
 - **`groundx-python`** indexing has a known non-fatal parser error (above).
 - **Security (low):** the Neo4j password `poctestpassword` is in plaintext in `poc/docker-compose.yml` and `poc/mcp/codegraphcontext.json` — acceptable as a throwaway local-only credential on a container with no real data; do not reuse it anywhere real.
 - **Freshness:** the graph is a point-in-time index; re-run `index`/`update` after code changes (auto-sync is out of scope for this PoC).
-- **Next:** define the task corpus and run the 3-arm benchmark (metrics in `../docs/research/context-graph-evaluation.md` §3.6).
+- **Next:** define the task corpus and run the 4-arm benchmark (metrics in `../docs/research/context-graph-evaluation.md` §3.6; arms + isolation in `../docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md` §4).

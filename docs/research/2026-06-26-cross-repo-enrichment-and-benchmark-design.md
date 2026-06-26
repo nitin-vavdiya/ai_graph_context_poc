@@ -1,6 +1,6 @@
 # Design — Cross-Repo Graph Linkage (Phase 0) and the Code-Change Benchmark (Phase 1)
 
-**Date:** 2026-06-26. **Status:** approved design, pre-implementation. **Scope:** defines how we make the CodeGraphContext (CGC) graph actually span repos, then how we benchmark the three arms (baseline / CGC / Serena) on real code-change tasks. This supersedes the loose "run the 3-arm benchmark next" note in `../../poc/SETUP-REPORT.md` §6 with a concrete, gated plan.
+**Date:** 2026-06-26. **Status:** approved design, pre-implementation. **Scope:** defines how we make the CodeGraphContext (CGC) graph actually span repos, then how we benchmark the four arms (baseline / CGC / Serena / both) on real code-change tasks. This supersedes the loose "run the 3-arm benchmark next" note in `../../poc/SETUP-REPORT.md` §6 with a concrete, gated plan.
 
 ## 1. Why this design exists (the finding that forced it)
 
@@ -78,11 +78,12 @@ Not built until Phase 0 passes. Captured here so Phase 0 is built toward the rig
 
 ### 4.1 Arms
 
-Three ways of giving Claude Code the **same** task, then compared on tokens, steps, and edit correctness.
+Four ways of giving Claude Code the **same** task, then compared on tokens, steps, and edit correctness. **Every arm uses Claude's built-in capability** (grep/read/edit/bash); the arms differ only in which MCP context tools are added on top.
 
-1. **Baseline — Claude alone, no helper.** Plain Claude Code as-is; it finds code by searching/reading files (grep). We point it at the relevant repos with `--add-dir` so it *can* search across them. This is the "what we do today" arm — the bar to beat.
-2. **CGC (enriched) — Claude + the graph.** Same Claude, but it can ask the CodeGraphContext graph structural questions ("who calls this?", "what's downstream of ai-server?") instead of grepping. The graph already knows the structure, including the cross-repo `CALLS_SERVICE` links added in Phase 0. Should reach the right code in fewer searches.
-3. **Serena — Claude + a language-server.** Same Claude, using IDE-grade "go to definition / find usages" — precise *inside* one repo, but it sees only one repo at a time, so on cross-repo tasks it cannot follow the trail. **Reported as a documented limit, not scored as a failure.**
+1. **Baseline — Claude alone, no helper.** Plain Claude Code as-is; it finds code by searching/reading files (grep). We point it at the relevant repos with `--add-dir` so it *can* search across them. This is the "what we do today" arm — the bar to beat. **No MCP tools.**
+2. **CGC (enriched) — Claude + the graph.** Same Claude, but it can ask the CodeGraphContext graph structural questions ("who calls this?", "what's downstream of ai-server?") instead of grepping. The graph already knows the structure, including the cross-repo `CALLS_SERVICE` links added in Phase 0. Should reach the right code in fewer searches. **MCP: codegraphcontext only — must not see Serena.**
+3. **Serena — Claude + a language-server.** Same Claude, using IDE-grade "go to definition / find usages" — precise *inside* one repo, but it sees only one repo at a time, so on cross-repo tasks it cannot follow the trail. **Reported as a documented limit, not scored as a failure. MCP: serena only — must not see CGC.**
+4. **Both — Claude + graph + language-server.** Same Claude with *both* tools available, to test whether they are complementary (graph for cross-repo routing, LSP for in-repo precision) and beat either alone. **MCP: codegraphcontext + serena, nothing else.**
 
 ### 4.2 Task shape (cross-repo)
 
@@ -101,29 +102,41 @@ Cost = tokens/change. Time = tool-calls/change + wall-clock latency. Quality = t
 
 The baseline must run with **Claude Code's built-in tools only** (Grep/Glob/Read/Edit/Bash — the realistic "today" arm), and with **no unfair side-context**: no MCP tools, no prior-session memory, no plugin-injected observations. `--bare` would do this in one flag, but it forces `ANTHROPIC_API_KEY` auth and **we have no API key** (OAuth login only) — so we assemble OAuth-safe equivalents.
 
-Apply the **same** isolation to all three arms; the *only* variable is the MCP config.
+Each arm must also see **only its own** MCP tools — CGC must not see Serena and vice-versa, and the "both" arm sees exactly those two and nothing else. Apply the **same** isolation flags to all four arms; the *only* variable is the MCP config.
+
+**Verified by dry-run (2026-06-26), all four arms PASS** — `poc/dryrun-isolation.sh` starts each arm for one trivial turn and reads the authoritative `system/init` event listing the loaded MCP servers:
+
+| Arm | MCP servers loaded (asserted) |
+|---|---|
+| baseline | *(none)* |
+| cgc | `codegraphcontext` only |
+| serena | `serena` only |
+| both | `codegraphcontext` + `serena` only |
+
+A model self-report on the baseline additionally confirmed: no MCP tools, **no recalled memory/observations** (claude-mem hook did not fire — 0 hook events), and **no knowledge of the session-specific PoC artifacts** (`CALLS_SERVICE`/enrichment) — only the generic CLAUDE.md framing. This empirically settles the earlier open question: `--setting-sources project,local` does drop the claude-mem hook.
 
 | Leak vector | Control | Status |
 |---|---|---|
-| MCP context tools (CGC / Serena / claude-mem MCP) | `--strict-mcp-config`; baseline passes **no** `--mcp-config` (CGC/Serena arms pass theirs) | verified (flag semantics) |
-| claude-mem SessionStart hook + caveman plugin (both registered in **user** source `~/.claude/settings.json`) | `--setting-sources project,local` (omits `user`) | static evidence strong; **confirm with a probe** (see below) |
+| MCP context tools (CGC / Serena / claude-mem MCP) | `--strict-mcp-config`; baseline passes **no** `--mcp-config`; each tool arm passes only its own config | **verified** — dry-run init events (table above) |
+| Cross-arm tool leak (CGC seeing Serena or vice-versa) | per-arm `--mcp-config` + `--strict-mcp-config` | **verified** — cgc arm = `codegraphcontext` only; serena arm = `serena` only |
+| claude-mem SessionStart hook + caveman plugin (both registered in **user** source `~/.claude/settings.json`) | `--setting-sources project,local` (omits `user`) | **verified** — 0 hook events; model recalled no observations |
 | This interactive session's context | one fresh `claude -p` process per task; never `--continue` / `--resume` | verified (headless is a cold session) |
-| CLAUDE.md auto-discovery (global `~/.claude/CLAUDE.md` **and** the research-repo `CLAUDE.md`, which is a parent of every target repo under `groundx-rnd/`) | **Accepted as a controlled constant** — not removed | decided 2026-06-26 |
+| CLAUDE.md auto-discovery (global `~/.claude/CLAUDE.md`, the research-repo `CLAUDE.md`, and `groundx-rnd/.claude/CLAUDE.md` — all parents of the target repos) | **Accepted as a controlled constant** — not removed | decided 2026-06-26 |
 
-**Residual bias (documented, by decision):** CLAUDE.md cannot be suppressed without `--bare`/API key, and `--setting-sources` does not govern it. It loads **identically in all three arms** (a constant, not a differential), and its content is generic project/working-style guidance, not task answers. We therefore accept it rather than mutate files mid-run. If a specific task's nearest `CLAUDE.md` is found to hint at structure relevant to that task, that task is dropped or relocated.
+**Residual bias (documented, by decision):** CLAUDE.md cannot be suppressed without `--bare`/API key, and `--setting-sources` does not govern it. It loads **identically in all four arms** (a constant, not a differential), and its content is generic project/working-style guidance, not task answers (the baseline self-report confirmed it conveys no task-specific knowledge). We therefore accept it rather than mutate files mid-run. If a specific task's nearest `CLAUDE.md` is found to hint at structure relevant to that task, that task is dropped or relocated.
 
-**Baseline command shape:**
+**Command shapes (identical isolation flags; only the MCP config varies):**
 ```bash
-claude -p "<task>" \
-  --strict-mcp-config \
-  --setting-sources project,local \
-  --add-dir <repos> \
-  --permission-mode bypassPermissions --model claude-opus-4-8 \
-  --output-format json
+# Baseline — no MCP
+claude -p "<task>" --strict-mcp-config --setting-sources project,local \
+  --add-dir <repos> --permission-mode bypassPermissions --model claude-opus-4-8 --output-format json
+# CGC / Serena / Both — add the arm's config
+... --mcp-config poc/mcp/codegraphcontext.json ...      # cgc
+... --mcp-config poc/mcp/serena.json ...                # serena
+... --mcp-config poc/mcp/both.json ...                  # both
 ```
-CGC and Serena arms = identical flags **plus** their `--mcp-config poc/mcp/<tool>.json`.
 
-**Open confirmation (blocked on session-limit reset, then a one-shot probe):** run a trivial headless prompt under `--strict-mcp-config --setting-sources project,local` asking the model to (a) list callable MCP tools and (b) report whether any project observations/memory were injected. Expected: no MCP tools, no injected memory. This empirically confirms `--setting-sources project,local` drops the claude-mem hook before we trust any baseline numbers.
+**Re-verify isolation any time** (does not run the benchmark): `bash poc/dryrun-isolation.sh` — prints each arm's boundary and asserts the loaded MCP servers match exactly. Run it before each benchmark session as a pre-flight.
 
 ## 5. Risks
 
