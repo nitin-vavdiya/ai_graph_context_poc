@@ -25,6 +25,17 @@ Claude must locate the right file and re-implement the fix. **Finish line = the 
 
 **What kind of changes are they?** Real bug-fix tickets (R1–R3) plus one small cross-repo change (A2). Each edit is *small* (usually one file). The hard part — and the thing we're actually measuring — is **finding the right code to change** in a massive repo, and whether the map/LSP makes that finding cheaper. The concrete tasks and exact prompts are in [`tasks/README.md`](tasks/README.md).
 
+**What is a "cross-repo" task, and why it's the headline.** Big products are split into separate services, each its own repo (e.g. `ai-server` in Python, `cashbot-go` in Go). They don't call each other as normal code — they talk **over the network** (HTTP/webhook). So a *cross-repo task* is a change you can't finish by staying in one repo: a change in one service's contract must ripple to the **other** repo that consumes it.
+
+| | In-repo task (R1–R3) | Cross-repo task (A2) |
+|---|---|---|
+| Where the answer lives | one repo | spans two repos |
+| How the code connects | function calls (in the source) | HTTP / webhook (over the wire) |
+| Can plain `grep` find the link? | yes — it's in the code | **no** — there is no code call between the repos |
+| What the agent needs | search within a repo | know the **service relationship** |
+
+This is exactly the pain at ~100 repos: when something changes, the agent doesn't know which *other* repo is affected, because the connection isn't a line of code — it's a network call `grep` can't see. The graph fixes this: Phase 0 added a `CALLS_SERVICE` edge (ai-server → cashbot-go) from the architecture model, so the agent can ask "who consumes this webhook?" and get a direct answer. **Baseline** must guess from config/URLs; **Serena** can't (one repo at a time). That is why A2 is the headline test — and why it had to be constructed (a real cross-repo change never lands as a single commit with a single test).
+
 **One line:** take a real bug → put it back → have 4 versions of Claude fix it → see which is cheapest and correct → learn if the code-map helps.
 
 ## 1. Why this design exists (the finding that forced it)
