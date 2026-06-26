@@ -98,11 +98,21 @@ Functions per repo: cashbot-go ~7,402 · groundx-python ~995 · groundx-ai-dashb
 - *CodeGraphContext* — listed functions in `ai-server` and returned a real `CALLS` edge using only the graph tools.
 - *Serena* — located `detectLayout` in `document/tasks/detect_layout.py` via LSP.
 
+## 5b. Cross-repo enrichment (Phase 0)
+
+A live check of the populated graph found it could not answer any cross-repo question: **0 cross-repo `CALLS`, 0 cross-repo `IMPORTS`**, and all 3,788 `IMPORTS` edges were unresolved name stubs (target `path = NULL`). The "unified graph" was six **disjoint** per-repo subgraphs — because the real coupling between these repos is **service-level** (HTTP/REST/webhook), which tree-sitter cannot parse. That coupling is recorded in the hand-authored C4 model `groundx-rnd/workspace.dsl`.
+
+**Fix (`poc/enrich/enrich.py`):** parse the dsl's model-block relationships and write repo-level `CALLS_SERVICE` edges onto the existing `:Repository` nodes. Tool-agnostic (operates on the graph, no CGC fork), idempotent (`MERGE`).
+
+**Result:** 4 cross-repo edges among the six repos — `groundx-ai-dashboard → groundx-ai-middleware → cashbot-go ⇄ ai-server`, with protocol/endpoint labels (e.g. `DocumentLayoutWebhook`, `POST /layout`). 31 out-of-corpus/infra relationships (mysql, redis, stripe, `internal-arcadia-agents`, …) were skipped and logged. Verified functionally: a headless Claude Code run using only CGC tools (direct Cypher) answered "what is up/downstream of ai-server" correctly from these edges (`is_error: false`) — data that exists *only* in the enriched graph.
+
+**Honest ceiling:** edges are repo/service granularity, not function-level; symbol-precise cross-wire mapping (which handler decodes a payload) would need OpenAPI enrichment and is deferred. Full rationale and the benchmark design it unblocks: [`../docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md`](../docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md).
+
 ## 6. Current state
 
-- Neo4j container `cgc-neo4j` running (graph persisted in a Docker volume).
+- Neo4j container `cgc-neo4j` running (graph persisted in a Docker volume); enriched with 4 cross-repo `CALLS_SERVICE` edges.
 - Both tools installed via `uv tool`; MCP config files under `poc/mcp/`.
-- Ready for the benchmark phase (3 arms: baseline / Serena / CodeGraphContext).
+- Ready for the benchmark phase (3 arms: baseline / Serena / CodeGraphContext) — gated on per-repo test-suite buildability (see design doc §4.4).
 
 ## 7. Reproduce / teardown
 
