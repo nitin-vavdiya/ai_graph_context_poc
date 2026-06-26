@@ -63,7 +63,7 @@ uv run --with neo4j python poc/enrich/enrich.py
 ```
 **Why:** indexing alone produces **zero** cross-repo edges (verified: all imports resolve to name-only stubs, and the real coupling between these repos is service-level HTTP/REST/webhook that tree-sitter cannot see). This pass reads the hand-authored C4 model `groundx-rnd/workspace.dsl` and writes repo-level `CALLS_SERVICE` edges onto the `:Repository` nodes. Idempotent (`MERGE`); re-run after editing the dsl. Out-of-corpus and infra relationships are skipped and logged, not dropped.
 
-Verified result: 4 cross-repo edges — `groundx-ai-dashboard → groundx-ai-middleware → cashbot-go ⇄ ai-server` (with protocol/endpoint labels). Confirmed answerable through Claude Code via CGC direct Cypher (`is_error: false`). Granularity is **repo-level**, not function-level (the dsl's ceiling) — enough to route an agent to the right downstream repo. Design + rationale: [`../docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md`](../docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md).
+Verified result: 4 cross-repo edges — `groundx-ai-dashboard → groundx-ai-middleware → cashbot-go ⇄ ai-server` (with protocol/endpoint labels). Confirmed answerable through Claude Code via CGC direct Cypher (`is_error: false`). Granularity is **repo-level**, not function-level (the dsl's ceiling) — enough to route an agent to the right downstream repo. Design + rationale: [`benchmark-design.md`](benchmark-design.md).
 
 ## 2. Serena (control arm)
 

@@ -1,6 +1,6 @@
 # Benchmark Task Definition
 
-What we run the 4 arms (baseline / CGC / Serena / both — see design doc §4.1) against. Start with **4 tasks** (one per scenario, plus an easy/hard pair for cross-repo) to validate the whole harness end-to-end, then expand. Oracle = run the repo's own tests (design §4.4); isolation per design §4.5; metrics per `../../docs/research/context-graph-evaluation.md` §3.6.
+What we run the 4 arms (baseline / CGC / Serena / both — see [`../benchmark-design.md`](../benchmark-design.md) §4.1) against. Start with **4 tasks** (one per scenario, plus an easy/hard pair for cross-repo) to validate the whole harness end-to-end, then expand. Oracle = run the repo's own tests (design §4.4); isolation per design §4.5; metrics per `../../docs/research/context-graph-evaluation.md` §3.6.
 
 ## Why these repos
 

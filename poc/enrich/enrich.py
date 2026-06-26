@@ -10,7 +10,7 @@ This script parses the dsl's model-block relationships and writes repo-level
 `CALLS_SERVICE` edges onto the existing `:Repository` nodes in Neo4j, so the
 graph can answer cross-repo blast-radius questions. Idempotent (MERGE).
 
-Design: docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md
+Design: poc/benchmark-design.md
 """
 from __future__ import annotations
 

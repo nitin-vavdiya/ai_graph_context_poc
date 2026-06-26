@@ -45,12 +45,21 @@ All four are permissive OSS (MIT). Detail and comparison live in the research do
 
 ## Documents
 
-- [`docs/research/context-graph-evaluation.md`](docs/research/context-graph-evaluation.md) — conceptual foundation, value & measurement, tool overviews, landscape survey, head-to-head comparison, and decision-support recommendation.
-- [`docs/research/multi-repo-and-remote-deployment.md`](docs/research/multi-repo-and-remote-deployment.md) — operational comparison: multi-repo behaviour, remote serving, security, storage, and change pickup for all four tools.
+The repo has two tiers: **research & decision** (why a code-context layer, which tools) and **PoC execution** (setup + benchmark).
+
+**Research & decision** — `docs/`
+
+- [`docs/research/context-graph-evaluation.md`](docs/research/context-graph-evaluation.md) — the main report: conceptual foundation, value & measurement, tool overviews, landscape survey, head-to-head comparison, and decision-support recommendation.
+- [`docs/research/multi-repo-and-remote-deployment.md`](docs/research/multi-repo-and-remote-deployment.md) — operational comparison: multi-repo behaviour, remote serving, security, storage, and change pickup.
 - [`docs/adr/0001-adopt-code-context-layer.md`](docs/adr/0001-adopt-code-context-layer.md) — decision to adopt a code-context layer; value vs delivery; permissive-OSS + measured-PoC constraints.
 - [`docs/adr/0002-poc-tool-selection-codegraphcontext-serena.md`](docs/adr/0002-poc-tool-selection-codegraphcontext-serena.md) — decision to take **CodeGraphContext + Serena** (plus a no-tool baseline) into the PoC.
-- [`poc/SETUP.md`](poc/SETUP.md) — reproducible setup runbook (install, index, wire into Claude Code, verify).
-- [`poc/SETUP-REPORT.md`](poc/SETUP-REPORT.md) — as-built record of how the setup was performed: decisions, problems-and-fixes, and verification evidence.
+
+**PoC execution** — `poc/` (start at the hub)
+
+- [`poc/README.md`](poc/README.md) — **PoC hub**: phases, the 4 arms, how to run, and links to everything below.
+- [`poc/benchmark-design.md`](poc/benchmark-design.md) — Phase-0 enrichment + the 4-arm benchmark design (arms, oracle, isolation, gates).
+- [`poc/SETUP.md`](poc/SETUP.md) · [`poc/SETUP-REPORT.md`](poc/SETUP-REPORT.md) — setup runbook and as-built record.
+- [`poc/tasks/README.md`](poc/tasks/README.md) — the benchmark task corpus and scoring.
 
 ## Status
 
@@ -60,4 +69,4 @@ Research-and-decision stage complete. **PoC tools finalized: CodeGraphContext + 
 
 **Phase 0 done** — cross-repo linkage. Indexing alone produced zero cross-repo edges (the real coupling is service-level, not in source); [`poc/enrich/enrich.py`](poc/enrich/enrich.py) loads the C4 `workspace.dsl` into the graph as repo-level `CALLS_SERVICE` edges, verified through Claude Code.
 
-**Next (Phase 1):** the 4-arm code-change benchmark (baseline / CGC / Serena / both) — design in [`docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md`](docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md). Arm isolation is verified ([`poc/dryrun-isolation.sh`](poc/dryrun-isolation.sh), all arms pass). Gated on per-repo test-suite buildability (§4.4); ai-server's Detectron2/GPU deps are the open risk to probe first.
+**Next (Phase 1):** the 4-arm code-change benchmark (baseline / CGC / Serena / both) — design in [`poc/benchmark-design.md`](poc/benchmark-design.md). Tasks + runner are built; arm isolation is verified ([`poc/dryrun-isolation.sh`](poc/dryrun-isolation.sh), all arms pass). Runs are paced one task at a time; gated on per-repo test-suite buildability (§4.4), with ai-server's Detectron2/GPU deps the open risk.

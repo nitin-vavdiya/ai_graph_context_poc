@@ -1,10 +1,10 @@
 # Design — Cross-Repo Graph Linkage (Phase 0) and the Code-Change Benchmark (Phase 1)
 
-**Date:** 2026-06-26. **Status:** approved design, pre-implementation. **Scope:** defines how we make the CodeGraphContext (CGC) graph actually span repos, then how we benchmark the four arms (baseline / CGC / Serena / both) on real code-change tasks. This supersedes the loose "run the 3-arm benchmark next" note in `../../poc/SETUP-REPORT.md` §6 with a concrete, gated plan.
+**Date:** 2026-06-26. **Status:** approved design, pre-implementation. **Scope:** defines how we make the CodeGraphContext (CGC) graph actually span repos, then how we benchmark the four arms (baseline / CGC / Serena / both) on real code-change tasks. This supersedes the loose "run the 3-arm benchmark next" note in [`SETUP-REPORT.md`](SETUP-REPORT.md) §6 with a concrete, gated plan.
 
 ## 1. Why this design exists (the finding that forced it)
 
-The benchmark was going to lead with cross-repo tasks, because the end goal is ~100 repos and the highest-value capability is cross-repo blast-radius (§3.6 of `context-graph-evaluation.md`). A live check of the populated Neo4j graph (2026-06-26) showed that **the graph cannot answer any cross-repo question today**:
+The benchmark was going to lead with cross-repo tasks, because the end goal is ~100 repos and the highest-value capability is cross-repo blast-radius (§3.6 of [`../docs/research/context-graph-evaluation.md`](../docs/research/context-graph-evaluation.md)). A live check of the populated Neo4j graph (2026-06-26) showed that **the graph cannot answer any cross-repo question today**:
 
 - **Cross-repo `CALLS` edges: 0.** **Cross-repo `IMPORTS` edges: 0.**
 - **All 3,788 `IMPORTS` edges are unresolved name stubs** — their target `Module` node has `path = NULL` (e.g. `numpy`, `torch`, `document.tasks.detect_layout`). CGC records the *name* of an import but never links it to the real definition node, even within a single repo.
@@ -70,7 +70,7 @@ One idempotent script (Python, `neo4j` driver already a CGC dependency). Behavio
 - `poc/enrich/` runs idempotently against the live graph.
 - Cross-repo query returns the expected `CALLS_SERVICE` chain among the six repos.
 - The skipped (out-of-corpus / infra) relationships are logged.
-- `poc/SETUP.md` / `SETUP-REPORT.md` updated with the enrichment step.
+- [`SETUP.md`](SETUP.md) / [`SETUP-REPORT.md`](SETUP-REPORT.md) updated with the enrichment step.
 
 ## 4. Phase 1 — the code-change benchmark (sketch, gated on Phase 0)
 
