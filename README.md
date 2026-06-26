@@ -54,4 +54,10 @@ All four are permissive OSS (MIT). Detail and comparison live in the research do
 
 ## Status
 
-Research-and-decision stage complete. **PoC tools finalized: CodeGraphContext + Serena**, measured against a plain-Claude-Code (no-tool) baseline (see ADR 0002). Hands-on validation is the next step; the PoC design and metrics are in the evaluation doc (§3.6, §9).
+Research-and-decision stage complete. **PoC tools finalized: CodeGraphContext + Serena**, measured against a plain-Claude-Code (no-tool) baseline (see ADR 0002).
+
+**Setup done + verified** (Python/TS/Go) — see [`poc/SETUP-REPORT.md`](poc/SETUP-REPORT.md).
+
+**Phase 0 done** — cross-repo linkage. Indexing alone produced zero cross-repo edges (the real coupling is service-level, not in source); [`poc/enrich/enrich.py`](poc/enrich/enrich.py) loads the C4 `workspace.dsl` into the graph as repo-level `CALLS_SERVICE` edges, verified through Claude Code.
+
+**Next (Phase 1):** the 3-arm code-change benchmark — design in [`docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md`](docs/research/2026-06-26-cross-repo-enrichment-and-benchmark-design.md). Gated on per-repo test-suite buildability (§4.4); ai-server's Detectron2/GPU deps are the open risk to probe first.
