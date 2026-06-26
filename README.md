@@ -47,7 +47,9 @@ All four are permissive OSS (MIT). Detail and comparison live in the research do
 
 - [`docs/research/context-graph-evaluation.md`](docs/research/context-graph-evaluation.md) — conceptual foundation, value & measurement, tool overviews, landscape survey, head-to-head comparison, and decision-support recommendation.
 - [`docs/research/multi-repo-and-remote-deployment.md`](docs/research/multi-repo-and-remote-deployment.md) — operational comparison: multi-repo behaviour, remote serving, security, storage, and change pickup for all four tools.
+- [`docs/adr/0001-adopt-code-context-layer.md`](docs/adr/0001-adopt-code-context-layer.md) — decision to adopt a code-context layer; value vs delivery; permissive-OSS + measured-PoC constraints.
+- [`docs/adr/0002-poc-tool-selection-codegraphcontext-serena.md`](docs/adr/0002-poc-tool-selection-codegraphcontext-serena.md) — decision to take **CodeGraphContext + Serena** (plus a no-tool baseline) into the PoC.
 
 ## Status
 
-Research-and-decision stage. Hands-on validation is deferred to a separate PoC; the recommended PoC design and metrics are in the evaluation doc.
+Research-and-decision stage complete. **PoC tools finalized: CodeGraphContext + Serena**, measured against a plain-Claude-Code (no-tool) baseline (see ADR 0002). Hands-on validation is the next step; the PoC design and metrics are in the evaluation doc (§3.6, §9).
