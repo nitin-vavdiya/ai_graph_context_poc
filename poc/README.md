@@ -12,7 +12,7 @@ Hands-on validation of the two finalized tools (**CodeGraphContext** + **Serena*
 
 ## Map
 
-- [`benchmark-design.md`](benchmark-design.md) — the plan: Phase-0 enrichment + the 4-arm benchmark (arms, oracle, **isolation §4.5**, gates).
+- [`benchmark-design.md`](benchmark-design.md) — the plan: Phase-0 enrichment + the 4-arm benchmark (arms, oracle, **isolation §4.5**, gates). **New to this? Start at §0 "In plain terms".**
 - [`SETUP.md`](SETUP.md) · [`SETUP-REPORT.md`](SETUP-REPORT.md) — reproducible setup runbook and the as-built record.
 - [`tasks/`](tasks/) — the benchmark task corpus ([`tasks/README.md`](tasks/README.md), [`tasks/tasks.jsonl`](tasks/tasks.jsonl), `tasks/fixtures/`).
 - `mcp/` — per-arm MCP configs: `codegraphcontext.json`, `serena.json`, `both.json` (baseline uses none).

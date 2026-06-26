@@ -2,6 +2,31 @@
 
 **Date:** 2026-06-26. **Status:** approved design, pre-implementation. **Scope:** defines how we make the CodeGraphContext (CGC) graph actually span repos, then how we benchmark the four arms (baseline / CGC / Serena / both) on real code-change tasks. This supersedes the loose "run the 3-arm benchmark next" note in [`SETUP-REPORT.md`](SETUP-REPORT.md) §6 with a concrete, gated plan.
 
+## 0. In plain terms (start here)
+
+**The question.** We have a huge codebase (100s of repos). When we ask Claude to make a code change, it burns time and tokens *hunting for the right code*. We think a **code map** (a code-graph tool) could help it find code faster. We want to prove whether that's true — with numbers, not opinion.
+
+**How we prove it — a fair race.** We give Claude the **same job** and run it **four ways**, then compare cost and success:
+
+| Contestant (arm) | What it has beyond plain Claude |
+|---|---|
+| baseline | nothing (today's normal) |
+| cgc | the code map (CodeGraphContext graph) |
+| serena | a code-aware tool (Serena / LSP) |
+| both | both tools |
+
+For each run we measure: **did it succeed, how many tokens, how many tool-calls/steps.** If the tool arms win, the map is worth it; if they tie with baseline, it isn't.
+
+**The "job" = a real bug-fix ticket.** A race needs a job with a clear finish line. So each task is a **real bug that was already fixed in this codebase** (it came with a test). We *put the bug back* (undo the old fix, keep the test), then hand Claude the **symptom** — e.g.:
+
+> *"Partner MCP tool executions sometimes fail to decode the response (`failed to parse MCP execution response`). Diagnose and fix it. Don't modify tests."*
+
+Claude must locate the right file and re-implement the fix. **Finish line = the original test goes from red to green** — checked automatically, no human opinion.
+
+**What kind of changes are they?** Real bug-fix tickets (R1–R3) plus one small cross-repo change (A2). Each edit is *small* (usually one file). The hard part — and the thing we're actually measuring — is **finding the right code to change** in a massive repo, and whether the map/LSP makes that finding cheaper. The concrete tasks and exact prompts are in [`tasks/README.md`](tasks/README.md).
+
+**One line:** take a real bug → put it back → have 4 versions of Claude fix it → see which is cheapest and correct → learn if the code-map helps.
+
 ## 1. Why this design exists (the finding that forced it)
 
 The benchmark was going to lead with cross-repo tasks, because the end goal is ~100 repos and the highest-value capability is cross-repo blast-radius (§3.6 of [`../docs/research/context-graph-evaluation.md`](../docs/research/context-graph-evaluation.md)). A live check of the populated Neo4j graph (2026-06-26) showed that **the graph cannot answer any cross-repo question today**:
