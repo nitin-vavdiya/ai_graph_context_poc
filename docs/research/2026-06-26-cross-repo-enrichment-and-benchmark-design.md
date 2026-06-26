@@ -78,9 +78,11 @@ Not built until Phase 0 passes. Captured here so Phase 0 is built toward the rig
 
 ### 4.1 Arms
 
-1. **Baseline** — plain Claude Code, no MCP tool, `--add-dir` over the relevant repos (so grep *can* cross repos — a fair, strong baseline).
-2. **CGC (enriched)** — CodeGraphContext MCP over the Phase-0-enriched graph.
-3. **Serena** — LSP control arm; for cross-repo tasks it structurally sees only one repo. This is **reported as a documented limit**, not scored as a failure.
+Three ways of giving Claude Code the **same** task, then compared on tokens, steps, and edit correctness.
+
+1. **Baseline — Claude alone, no helper.** Plain Claude Code as-is; it finds code by searching/reading files (grep). We point it at the relevant repos with `--add-dir` so it *can* search across them. This is the "what we do today" arm — the bar to beat.
+2. **CGC (enriched) — Claude + the graph.** Same Claude, but it can ask the CodeGraphContext graph structural questions ("who calls this?", "what's downstream of ai-server?") instead of grepping. The graph already knows the structure, including the cross-repo `CALLS_SERVICE` links added in Phase 0. Should reach the right code in fewer searches.
+3. **Serena — Claude + a language-server.** Same Claude, using IDE-grade "go to definition / find usages" — precise *inside* one repo, but it sees only one repo at a time, so on cross-repo tasks it cannot follow the trail. **Reported as a documented limit, not scored as a failure.**
 
 ### 4.2 Task shape (cross-repo)
 
