@@ -1,0 +1,52 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Python (PoC tooling: CodeGraphContext, code-review-graph)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.uv/
+*.egg-info/
+
+# Node (PoC tooling: codegraph)
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# Local secrets / env
+.env
+.env.*
+!.env.example
+
+# --- Context-graph tool artifacts (generated indexes/graphs — do not commit) ---
+# CodeGraphContext
+.codegraphcontext/
+# codegraph (colbymchenry)
+.codegraph/
+# code-review-graph
+.code-review-graph/
+# Serena
+.serena/
+
+# Graph DB data (Neo4j / FalkorDB / Kuzu local stores)
+neo4j/
+*.db
+*.db-wal
+*.db-shm
+*.kuzu/
+data/
+
+# PoC scratch / measurement output
+scratch/
+tmp/
+*.log
+
+# --- Sample project under test (source code indexed by the PoC tools — not part of this repo) ---
+groundx-rnd/
