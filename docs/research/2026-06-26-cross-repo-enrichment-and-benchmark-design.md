@@ -97,11 +97,40 @@ Cost = tokens/change. Time = tool-calls/change + wall-clock latency. Quality = t
 - **Buildable + green test suites** for each repo a task touches (Python `pytest`, Go `go test`, TS `npm test`). Any repo that does not build/test green locally is **excluded from the runnable-oracle set**; tasks are authored only against repos that pass. This gate is checked per-repo before the corpus is locked.
 - A **green baseline state** per task: the repo's tests pass *before* the task is applied, so a post-edit failure is attributable to the change.
 
+### 4.5 Arm isolation protocol (so the baseline is genuinely "plain Claude")
+
+The baseline must run with **Claude Code's built-in tools only** (Grep/Glob/Read/Edit/Bash — the realistic "today" arm), and with **no unfair side-context**: no MCP tools, no prior-session memory, no plugin-injected observations. `--bare` would do this in one flag, but it forces `ANTHROPIC_API_KEY` auth and **we have no API key** (OAuth login only) — so we assemble OAuth-safe equivalents.
+
+Apply the **same** isolation to all three arms; the *only* variable is the MCP config.
+
+| Leak vector | Control | Status |
+|---|---|---|
+| MCP context tools (CGC / Serena / claude-mem MCP) | `--strict-mcp-config`; baseline passes **no** `--mcp-config` (CGC/Serena arms pass theirs) | verified (flag semantics) |
+| claude-mem SessionStart hook + caveman plugin (both registered in **user** source `~/.claude/settings.json`) | `--setting-sources project,local` (omits `user`) | static evidence strong; **confirm with a probe** (see below) |
+| This interactive session's context | one fresh `claude -p` process per task; never `--continue` / `--resume` | verified (headless is a cold session) |
+| CLAUDE.md auto-discovery (global `~/.claude/CLAUDE.md` **and** the research-repo `CLAUDE.md`, which is a parent of every target repo under `groundx-rnd/`) | **Accepted as a controlled constant** — not removed | decided 2026-06-26 |
+
+**Residual bias (documented, by decision):** CLAUDE.md cannot be suppressed without `--bare`/API key, and `--setting-sources` does not govern it. It loads **identically in all three arms** (a constant, not a differential), and its content is generic project/working-style guidance, not task answers. We therefore accept it rather than mutate files mid-run. If a specific task's nearest `CLAUDE.md` is found to hint at structure relevant to that task, that task is dropped or relocated.
+
+**Baseline command shape:**
+```bash
+claude -p "<task>" \
+  --strict-mcp-config \
+  --setting-sources project,local \
+  --add-dir <repos> \
+  --permission-mode bypassPermissions --model claude-opus-4-8 \
+  --output-format json
+```
+CGC and Serena arms = identical flags **plus** their `--mcp-config poc/mcp/<tool>.json`.
+
+**Open confirmation (blocked on session-limit reset, then a one-shot probe):** run a trivial headless prompt under `--strict-mcp-config --setting-sources project,local` asking the model to (a) list callable MCP tools and (b) report whether any project observations/memory were injected. Expected: no MCP tools, no injected memory. This empirically confirms `--setting-sources project,local` drops the claude-mem hook before we trust any baseline numbers.
+
 ## 5. Risks
 
 - **Test suites may not build locally** (deps, fixtures, services). Mitigation: the §4.4 gate excludes non-runnable repos; if too few survive, fall back to golden-diff + completeness scoring for those tasks (revisit, do not silently switch oracles).
 - **C4 dsl drift** — edges only as accurate as the hand-authored model. Mitigation: Phase-0 verify step prints the edge list for human sanity-check.
 - **Repo-level edges too coarse** for some tasks. Mitigation: if a benchmark task needs symbol-precise cross-wire routing, that task documents the need for the deferred OpenAPI-enrichment track rather than forcing it now.
+- **Baseline contamination** (no API key → cannot use `--bare`). Mitigation: the §4.5 OAuth-safe isolation protocol; the `--setting-sources project,local` claim must be empirically confirmed by the §4.5 probe before any numbers are trusted. CLAUDE.md is an accepted constant, not a differential.
 
 ## 6. What this unblocks
 
