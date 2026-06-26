@@ -1,5 +1,7 @@
 # PoC — code-context tools for an LLM coding agent
 
+> ▶ **Picking this back up?** Start at [`RESUME.md`](RESUME.md) — the exact next commands.
+
 Hands-on validation of the two finalized tools (**CodeGraphContext** + **Serena**) against a plain-Claude-Code baseline, measured on real code-change tasks over the `groundx-rnd/` corpus. The *why* and tool selection live in [`../docs/research/`](../docs/research/) and the [ADRs](../docs/adr/); this folder is the *execution*.
 
 ## Phases
