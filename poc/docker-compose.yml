@@ -1,0 +1,18 @@
+# Neo4j backend for CodeGraphContext (the "graph" arm).
+# Local-only PoC. Start:  docker compose -f poc/docker-compose.yml up -d
+# Browser UI: http://localhost:7474  (user: neo4j, pass: poctestpassword)
+services:
+  neo4j:
+    image: neo4j:5
+    container_name: cgc-neo4j
+    ports:
+      - "7474:7474"   # HTTP browser
+      - "7687:7687"   # Bolt (driver)
+    environment:
+      NEO4J_AUTH: neo4j/poctestpassword
+      NEO4J_server_memory_heap_max__size: 2G
+      NEO4J_server_memory_pagecache_size: 1G
+    volumes:
+      - cgc-neo4j-data:/data
+volumes:
+  cgc-neo4j-data:

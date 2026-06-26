@@ -49,6 +49,8 @@ All four are permissive OSS (MIT). Detail and comparison live in the research do
 - [`docs/research/multi-repo-and-remote-deployment.md`](docs/research/multi-repo-and-remote-deployment.md) — operational comparison: multi-repo behaviour, remote serving, security, storage, and change pickup for all four tools.
 - [`docs/adr/0001-adopt-code-context-layer.md`](docs/adr/0001-adopt-code-context-layer.md) — decision to adopt a code-context layer; value vs delivery; permissive-OSS + measured-PoC constraints.
 - [`docs/adr/0002-poc-tool-selection-codegraphcontext-serena.md`](docs/adr/0002-poc-tool-selection-codegraphcontext-serena.md) — decision to take **CodeGraphContext + Serena** (plus a no-tool baseline) into the PoC.
+- [`poc/SETUP.md`](poc/SETUP.md) — reproducible setup runbook (install, index, wire into Claude Code, verify).
+- [`poc/SETUP-REPORT.md`](poc/SETUP-REPORT.md) — as-built record of how the setup was performed: decisions, problems-and-fixes, and verification evidence.
 
 ## Status
 
