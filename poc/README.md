@@ -12,6 +12,7 @@ Hands-on validation of the two finalized tools (**CodeGraphContext** + **Serena*
 
 ## Map
 
+- [`TEST-PLAN.md`](TEST-PLAN.md) — **test plan & measurement plan**: objective, hypothesis, the 4 arms, test cases, procedure, what we measure and how we reach a verdict, execution schedule, validity limits.
 - [`REFERENCE.md`](REFERENCE.md) — **one-stop reference**: command cheatsheet, arms + isolation, results/metrics schema, how to add a task, file map, versions, and gotchas.
 - [`benchmark-design.md`](benchmark-design.md) — the plan: Phase-0 enrichment + the 4-arm benchmark (arms, oracle, **isolation §4.5**, gates). **New to this? Start at §0 "In plain terms".**
 - [`SETUP.md`](SETUP.md) · [`SETUP-REPORT.md`](SETUP-REPORT.md) — reproducible setup runbook and the as-built record.
