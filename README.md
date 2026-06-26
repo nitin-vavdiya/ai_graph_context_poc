@@ -57,6 +57,7 @@ The repo has two tiers: **research & decision** (why a code-context layer, which
 **PoC execution** — `poc/` (start at the hub)
 
 - [`poc/README.md`](poc/README.md) — **PoC hub**: phases, the 4 arms, how to run, and links to everything below.
+- [`poc/REFERENCE.md`](poc/REFERENCE.md) — one-stop reference: commands, results schema, how to add tasks, file map, versions, gotchas.
 - [`poc/benchmark-design.md`](poc/benchmark-design.md) — Phase-0 enrichment + the 4-arm benchmark design (arms, oracle, isolation, gates).
 - [`poc/SETUP.md`](poc/SETUP.md) · [`poc/SETUP-REPORT.md`](poc/SETUP-REPORT.md) — setup runbook and as-built record.
 - [`poc/tasks/README.md`](poc/tasks/README.md) — the benchmark task corpus and scoring.
