@@ -33,6 +33,32 @@ Oracle is "run tests", so tasks live where tests run green locally (verified 202
 
 All three real bugfixes were verified red→green on 2026-06-26. A2 is kept constructed because a genuine cross-repo change does not land as one commit with one test suite (the coupling is service-level) — it is the graph discriminator: `engineVersion` is absent from cashbot-go (not greppable), so the agent must trace ai-server → cashbot-go.
 
+## What we ask Claude (verbatim)
+
+The exact prompt handed to Claude (identical across all 4 arms). It states the **symptom/requirement, not the fix** — locating and understanding the code is the agent's job.
+
+**R1 — we ask:**
+> "In the GroundX partner integration, executing an MCP tool sometimes fails to decode the upstream response (error: failed to parse MCP execution response). Diagnose the cause and fix the response handling so MCP tool executions decode correctly. Don't modify any test file."
+
+→ kind of change: **a bug fix** — Claude edits `pkg/partner/partners/groundx/mcp.go` to decode the response properly.
+
+**R2 — we ask:**
+> "For partner MCP accounts, an auto-generated tool is being exposed that duplicates a partner-specific tool; partner accounts should not see it. Update the per-account tool registration so the shadowed operation is hidden for partners. Don't modify any test file."
+
+→ **a behavior fix** — Claude edits `pkg/mcp/mcp.go` to filter out that tool.
+
+**R3 — we ask:**
+> "Valid OAuth token requests are sometimes rejected with invalid_grant because the resource URL doesn't match when it differs only by normalization. Fix the OAuth grant handling so resource URLs are compared correctly. Don't modify any test file."
+
+→ **a bug fix** — Claude edits `pkg/partner/partners/groundx/oauth.go` to normalize URLs before comparing.
+
+**A2 — we ask:**
+> "The ai-server webhook is adding a new field engineVersion. Find the service that consumes this webhook and add the field so it's decoded."
+
+→ **a small feature/change spanning repos** — Claude adds a field to the consumer struct (`pkg/model/services/response.go`).
+
+> These prompts are paraphrased here for reading; the exact strings the runner sends live in [`tasks.jsonl`](tasks.jsonl) (`prompt` field).
+
 ## Task schema (`tasks.jsonl`, one JSON object per line)
 
 ```json
