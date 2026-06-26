@@ -50,3 +50,6 @@ tmp/
 
 # --- Sample project under test (source code indexed by the PoC tools — not part of this repo) ---
 groundx-rnd/
+
+# Benchmark run outputs (may contain groundx-rnd code snippets)
+poc/results/

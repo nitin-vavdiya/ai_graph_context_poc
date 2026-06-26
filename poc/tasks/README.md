@@ -55,6 +55,16 @@ Each task runs once per arm (4 runs/task); record raw JSON per run for audit.
 
 Before scaling the corpus: run all 4 tasks × 4 arms once (16 runs), confirm the runner (a) applies setup/green baseline, (b) launches each arm with the right isolation flags, (c) captures tokens/turns/is_error, (d) runs the oracle and records pass/fail, (e) restores the repo to clean state between runs. Only once that loop is trustworthy do we expand to ~2–3 tasks per scenario.
 
+## Runner (`../run.sh`)
+
+```bash
+bash poc/run.sh --dry                  # validate plumbing, no Claude calls (applies canonical fixes)
+bash poc/run.sh --tasks C1 --arms baseline   # one real cell
+bash poc/run.sh                        # full matrix: 4 tasks × 4 arms = 16 real runs
+```
+
+Per cell it: snapshots the repo (git stash-create — preserves pre-existing local state like a modified `AGENTS.md` and untracked `documents-latest/`), applies the task setup (e.g. seeds the C1 bug), launches Claude with that arm's isolation flags + MCP config, parses `usage`/turns/tool-calls/`is_error` from the stream-json log, runs the oracle (tests/build/completeness, plus the B1 behavior fixture), appends a row to `results/results.csv`, and restores the repo. Validated 2026-06-26: dry run (pass+fail paths) and one real cell (C1/baseline — the agent found and fixed the seeded bug). Raw per-cell logs and `results/` are gitignored (they contain groundx-rnd code snippets).
+
 ## Concrete tasks (3 — grounded + verified 2026-06-26)
 
 See `tasks.jsonl`. All anchors are real symbols in green-testing code.
