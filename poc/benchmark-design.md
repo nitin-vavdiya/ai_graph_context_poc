@@ -148,3 +148,29 @@ claude -p "<task>" --strict-mcp-config --setting-sources project,local \
 ## 6. What this unblocks
 
 A measured, honest answer to the core research question: does a cross-repo-aware graph let an LLM make a cross-repo change with fewer tokens / fewer tool-calls and more completely than strong baseline grep — and where Serena's single-repo model cannot follow. Numbers, not adjectives (§3.6).
+
+## 7. Run plan — incremental, checkpointed
+
+We do **not** run the full 16-cell matrix in one shot — a Claude rate limit or a single bad cell would otherwise blow up the whole batch. Runs are paced so a failure costs at most one task.
+
+**Unit = one task at a time** (each task = its 4 arms = 4 Claude runs). After each task: stop, show `results/results.csv`, confirm the repo restored clean, and wait for explicit go before the next.
+
+**Order (cheap/safe → expensive/complex):**
+
+1. **C1** — locate-and-fix, 1 repo, fast (baseline already proven).
+2. **B1** — in-repo, ~20-file edit, more tool calls.
+3. **A1** — cross-repo easy / control.
+4. **A2** — cross-repo hard / discriminator.
+
+**Within a task, arm order:** `baseline → cgc → serena → both` — baseline cheapest first, so if a limit hits mid-task we've already captured the most arms.
+
+**Escape hatch:** the runner filters by `--tasks` and `--arms`, so if a limit looms we drop to one cell at a time (`bash poc/run.sh --tasks C1 --arms cgc`) and resume exactly where we stopped — completed cells are not redone.
+
+**Pre-flight before each MCP batch (cgc / serena / both arms):**
+
+- `cgc-neo4j` container up **and** the Phase-0 `CALLS_SERVICE` edges present (the CGC arm needs them).
+- Serena's first call may warm language servers (slower) — expected, not a failure.
+
+**Results handling:** the runner *appends* to `results/results.csv`; re-running a cell adds a row (kept for audit). Analysis takes the **latest** row per `(task, arm)`. Any duplicate is flagged before analysis.
+
+**Per-task checkpoint reported:** per arm — `is_error`, `oracle_pass`, `completeness`, tool-calls (+ mcp), turns, tokens — plus "repo restored clean ✓". Captured in that task's [`runs/<TASK>.md`](runs/).
