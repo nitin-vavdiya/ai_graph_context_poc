@@ -55,14 +55,30 @@ mkdir -p "$OUT" "$RUNS"
 RESULTS="$OUT/results.csv"; [ "$DRY" = 1 ] && RESULTS="$OUT/results.dry.csv"
 [ -f "$RESULTS" ] || echo "ts,task,arm,is_error,oracle_pass,completeness,tool_calls,mcp_tool_calls,num_turns,in_tokens,out_tokens,cache_read,duration_ms,cost_usd" > "$RESULTS"
 
+# ---- repo PARKING: physically move a repo off-disk so the agent genuinely
+# cannot read it (—add-dir is NOT a sandbox under bypassPermissions: the Read/Bash
+# tools open any absolute path). The graph (Neo4j) keeps the repo's indexed source,
+# so only cgc can answer questions about a parked repo. Used by cross-repo tasks
+# (A3) to recreate the real "repo not on this machine" condition. -----------------
+PARKDIR="$OUT/.parked"; PARKED=""
+park_repo() { # $1 = repo basename
+  local r="$1"; [ -d "$RND/$r" ] || return 0
+  mkdir -p "$PARKDIR"; mv "$RND/$r" "$PARKDIR/$r" && PARKED="$PARKED $r"
+  echo "  parked off-disk: $r (absent from workspace; only the graph retains it)"
+}
+unpark_all() { local r; for r in $PARKED; do [ -d "$PARKDIR/$r" ] && mv "$PARKDIR/$r" "$RND/$r"; done; PARKED=""; }
+
 # ---- repo snapshot / restore (file-based; bash 3.2 has no assoc arrays) ------
+# All three are no-ops if the repo dir is absent (e.g. parked off-disk).
 snapshot_repo() { # $1 = repo path
+  [ -d "$1" ] || return 0
   local b s; b=$(basename "$1")
   s=$(git -C "$1" stash create 2>/dev/null); [ -z "$s" ] && s=$(git -C "$1" rev-parse HEAD)
   echo "$s" > "$OUT/.snap_$b"
   git -C "$1" ls-files --others --exclude-standard 2>/dev/null | sort > "$OUT/.untracked_base_$b"
 }
 restore_repo() { # $1 = repo path
+  [ -d "$1" ] || return 0
   local r="$1" b snap; b=$(basename "$1"); snap=$(cat "$OUT/.snap_$b")
   git -C "$r" restore --source="$snap" -- . 2>/dev/null || git -C "$r" checkout "$snap" -- . 2>/dev/null
   # remove only files created during the cell; never touch preserved data dirs
@@ -75,6 +91,7 @@ restore_repo() { # $1 = repo path
 # untracked files are the pre-existing base set + preserved data dirs.
 # Returns 1 and prints a loud warning if contaminated. $2 = phase label.
 assert_pristine() { # $1 = repo path, $2 = label
+  [ -d "$1" ] || { echo "  (pristine check skipped: $(basename "$1") parked off-disk)"; return 0; }
   local r="$1" lbl="$2" b snap dirty extra; b=$(basename "$1"); snap=$(cat "$OUT/.snap_$b")
   dirty=$(git -C "$r" diff "$snap" --name-only -- . 2>/dev/null | tr '\n' ' ')
   git -C "$r" ls-files --others --exclude-standard 2>/dev/null | sort > "$OUT/.untracked_chk_$b"
@@ -215,7 +232,7 @@ gen_run_doc() { # $1 = task index
 # ---- main loop --------------------------------------------------------------
 snapshot_repo "$RND/cashbot-go"
 snapshot_repo "$RND/ai-server"
-trap 'restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"' EXIT
+trap 'unpark_all; restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"' EXIT
 
 NTASK=$(jq -s 'length' "$TASKS")
 echo "Runner: $NTASK tasks x ${#ARM_NAMES[@]} arms  (dry=$DRY)"; echo
@@ -231,8 +248,13 @@ for i in $(seq 0 $((NTASK-1))); do
   TCOMMIT=$(jq -rs ".[$i].commit // \"\"" "$TASKS")
   TCODE=$(jq -rs ".[$i].code_files // [] | join(\" \")" "$TASKS")
   TPKG=$(jq -rs ".[$i].test_pkg // \"\"" "$TASKS")
+  TPARK=$(jq -rs ".[$i].park_repos // [] | join(\" \")" "$TASKS")
   wants "$id" "$ONLY_TASKS" || continue
   add=(); for r in "${repos[@]}"; do add+=(--add-dir "$RND/$r"); done
+
+  # Physically remove parked repos from disk for this task's cells (real isolation,
+  # since --add-dir does not sandbox reads). The graph still holds their source.
+  for r in $TPARK; do park_repo "$r"; done
 
   for arm in "${ARM_NAMES[@]}"; do
     wants "$arm" "$ONLY_ARMS" || continue
@@ -264,6 +286,7 @@ for i in $(seq 0 $((NTASK-1))); do
     restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"
     echo
   done
+  unpark_all   # restore any parked repos before the next task / exit
   [ "$DRY" = 1 ] || gen_run_doc "$i"   # dry is plumbing-only; don't overwrite committed run docs
   echo
 done
