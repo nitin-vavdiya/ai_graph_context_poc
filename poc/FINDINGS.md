@@ -76,3 +76,21 @@ They look alike because they *behaved* alike (`mcp=0`, easy-locate), but they ar
 
 ### Methodology consequence
 Because cost on easy tasks is dominated by `cache_read ≈ context-size × turns` (turn count is random per run), **rank arms by `oracle_pass` then `cost_usd`, never by `cache_read`/`total billable`, and never off a single run.** Run the decisive task (A2) **≥3× and take the median** so a true effect can clear the noise. (Details: [`REFERENCE.md`](REFERENCE.md) §3.)
+
+## ⚠ Quality audit — "passed the oracle" ≠ "equal-quality result" (added 2026-06-29)
+
+Prompted by the question "how do you ensure all four arms produced the same/quality result?", we audited *what each arm actually did* (not just pass/fail) via `poc/quality-audit.sh` + transcript inspection. Two real problems surfaced:
+
+**1. Weak oracles pass quality differences (A2).** All four arms "passed" A2, but the actual edits differed: baseline added `EngineVersion **string**` while cgc/serena/both added `EngineVersion ***string**`. With `omitempty`, the value-type version can't distinguish absent-vs-empty and is inconsistent with the struct's other optional fields (all `*string`). The oracle (`grep 'json:"engineVersion'` + `go build`) can't see the difference — so a lower-quality change scored an identical pass.
+
+**2. R1–R3 are gameable via git (critical).** The real-commit bug is injected as an *uncommitted* reverse-apply, leaving a git-visible fingerprint. On R3, **3 of 4 arms (baseline, cgc, both) did not debug the bug at all** — they ran `git diff`, then `git checkout HEAD -- oauth.go` / `git stash` to revert our injection, restoring the shipped fix for free. Only serena genuinely fixed it (6 edits). `go test` reports `oracle_pass=1` for all four regardless. So R3's pass-rate and cost/efficiency numbers are contaminated (they partly measure "did the arm think to git-revert," which is cheap, vs genuine debugging, which is expensive) — NOT graph-vs-grep. R1/R2 were fixed directly this time but are equally gameable (luck, not safety). The `mcp=0` graph-adoption finding is unaffected.
+
+**Implications for reading the results:**
+- Rank/efficiency comparisons on R1–R3 are unreliable wherever git-gaming occurred (confirmed on R3).
+- "All arms passed" must never be reported without the per-arm quality audit (files changed, edit type, git-gaming check, mcp usage).
+
+**Fixes (not yet applied):**
+- **R1–R3:** inject the bug as a **commit** so `HEAD` holds the buggy code (`git checkout HEAD` then restores the *bug*, forcing a genuine fix); or strip `.git` / deny `git checkout` during the cell.
+- **A2/A3:** tighten the oracle to assert the field *type* (`*string` + `omitempty`), not just the json tag.
+- **A4:** score *precision* (penalize wrong files), not just recall.
+- **General:** `poc/quality-audit.sh <TASK>` is now part of result review — run it before trusting any cross-arm comparison.
