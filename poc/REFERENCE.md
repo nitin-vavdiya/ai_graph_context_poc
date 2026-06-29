@@ -170,6 +170,7 @@ poc/
 - **Results contain real code** — `poc/results/` (raw logs) is gitignored; committed run docs include tool **names only**, never inputs/outputs.
 - **`--dry` is isolated from real data** — it writes `results.dry.csv` + `*.dry.jsonl` and skips run-doc regen, so plumbing tests can't clobber real `results.csv`/run docs/logs. (Before this fix, a dry run appended `dry` rows that "latest-row-wins" then treated as the real result, and truncated the real transcripts.)
 - **cache_read is noise, not an arm property** — see §3 "Interpreting the metrics"; rank arms by `cost_usd` / `oracle_pass`, not by `cache_read` or `total billable`, and never off a single run on an easy task.
+- **MCP `status: "pending"` in the init snapshot is NOT a failure** — in headless `claude -p` the `system/init` event shows MCP servers as `pending` with **zero `mcp__` tools** in its `tools` array, even when those tools are available and callable later in the same session (async connect, no "connected" event re-emitted). Judge availability only from an actual `mcp__*` `tool_use` in the transcript or a forced-call probe — never from the init snapshot. Verified 2026-06-29: forced probes called `mcp__codegraphcontext__find_code` and `mcp__serena__find_symbol` successfully, so `mcp=0` in the R-tasks is a genuine model choice, not a block.
 
 ## 9. Glossary
 

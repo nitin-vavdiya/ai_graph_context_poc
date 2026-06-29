@@ -2,6 +2,15 @@
 
 Interim conclusions as the benchmark executes. Per-cell numbers live in [`runs/<TASK>.md`](runs/); metric mechanics in [`REFERENCE.md`](REFERENCE.md) §3. This file records what the results *mean*, updated after each task.
 
+## Tool-availability verification (why `mcp=0` is a real choice, not a block)
+
+**Verified 2026-06-29.** Before trusting any `mcp=0` result we confirmed the MCP tools are actually offered to the model in the benchmark harness:
+
+- A forced probe (`claude -p "call mcp__codegraphcontext__find_code …"` with the exact arm flags) **succeeded** — the model called `mcp__codegraphcontext__find_code` and got a real graph result (20 `NewClient` definitions). The same probe with `serena.json` **succeeded** via `mcp__serena__find_symbol`.
+- Therefore the tools are available and functional; `mcp=0` across R1–R3 means the model **declined** them on easy single-repo tasks, not that they were blocked or disconnected.
+
+**⚠ Do not judge MCP availability from the stream-json `system/init` snapshot.** In headless `claude -p` mode that snapshot shows each MCP server as `status: "pending"` and lists **zero `mcp__` tools** in its `tools` array — *even when the tools are in fact available and callable later in the same session* (servers connect asynchronously after init and no "connected" event is re-emitted). The only reliable availability signals are (a) an actual `mcp__*` `tool_use` in the transcript, or (b) a forced-call probe. `dryrun-isolation.sh` checks server *names* in the init snapshot (necessary: proves the right config loaded + isolation holds) but that is **not** proof of connection — use the forced probe for that.
+
 ## Status as of R1 (×2) + R2 (×2) + R3 (×1) — single-repo tasks only
 
 > **R3 update:** first task with failures — cgc and serena did not fix it, baseline and both did. The failures are **not arm-driven** (the graph arm `both` passed; the non-graph `baseline` passed; `mcp=0` everywhere) — they are task difficulty + run variance. Two sharper lessons: (a) **`oracle_pass` is itself noisy on hard tasks** (a single run gave a 50% pass rate mapping to no arm) → hard tasks need a multi-run pass *rate*, not one pass/fail; (b) **failing runs cost more** (wrong path = more turns), so cost and correctness are entangled — never compare cost across a mix of pass/fail cells. Detail: [`runs/R3.md`](runs/R3.md).
