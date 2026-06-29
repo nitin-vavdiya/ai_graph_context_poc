@@ -146,6 +146,14 @@ gen_run_doc() { # $1 = task index
   prm=$(jq -rs ".[$i].prompt" "$TASKS"); rdir=$(jq -rs ".[$i].run_dir" "$TASKS")
   local reps; reps=$(jq -rs ".[$i].repos|join(\", \")" "$TASKS")
   local doc="$RUNS/$id.md"
+  # Preserve a hand-written narrative across regenerations: capture everything
+  # after the marker; treat the TODO placeholder as empty. (Auto sections above
+  # the marker are always rebuilt from the latest metrics.)
+  local saved_narr=""
+  if [ -f "$doc" ]; then
+    saved_narr="$(awk 'index($0,"## Narrative / takeaway")==1{f=1;next} f' "$doc")"
+    case "$saved_narr" in *"_TODO (filled after review"*) saved_narr="" ;; esac
+  fi
   {
     echo "# Benchmark Run — $id ($scn)"
     echo
@@ -188,7 +196,11 @@ gen_run_doc() { # $1 = task index
     echo
     echo "## Narrative / takeaway"
     echo
-    echo "_TODO (filled after review): what each arm did to locate the code, whether the graph/LSP changed the path, and the cross-arm comparison for this scenario._"
+    if [ -n "$saved_narr" ]; then
+      printf '%s\n' "$saved_narr"
+    else
+      echo "_TODO (filled after review): what each arm did to locate the code, whether the graph/LSP changed the path, and the cross-arm comparison for this scenario._"
+    fi
   } > "$doc"
   echo "  doc: $doc"
 }
