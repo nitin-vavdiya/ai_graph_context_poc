@@ -2,6 +2,16 @@
 
 Interim conclusions as the benchmark executes. Per-cell numbers live in [`runs/<TASK>.md`](runs/); metric mechanics in [`REFERENCE.md`](REFERENCE.md) §3. This file records what the results *mean*, updated after each task.
 
+## ★ Headline conclusion (after R1–R3 + A2 pass 1)
+
+**As wired, this benchmark does not demonstrate a graph/LSP benefit — and it revealed why.** Across every cell run (R1×3, R2×3, R3×2, A2×1 = 36 cells), **the model never once called a graph or LSP tool (`mcp=0` everywhere)**, even on A2, the cross-repo task designed to require the graph, where cgc had 25 graph tools offered and used none. All arms — including baseline — solved every task with built-in `grep`/`find`/`read`/`edit`, and all passed.
+
+**The root cause is a design flaw, not a null result about graphs:** every task mounts all relevant repos via `--add-dir`, so plain `grep` can span the repo boundary. That neutralizes the graph's only real advantage — cheap structural lookup when you *can't* brute-force-search everything. At this 2-repo scale grep is simply sufficient, so a rational model never reaches for the graph. The hypothesis (graph cuts find-cost at ~100-repo, billions-of-lines scale) is therefore **untested**, not disproven: the harness doesn't reproduce the scale where brute-force grep breaks down.
+
+**What a valid test would need** (see A2 redesign in [`runs/A2.md`](runs/A2.md)): deny brute-force search across all repos — e.g. mount only the run repo and force cross-repo discovery through the graph, and/or scale to many repos so grepping everything is infeasible. Until then, the honest finding is: *given local access to both repos, Claude prefers grep over the graph, and grep is enough.*
+
+Everything below is the evidence trail that leads here.
+
 ## Tool-availability verification (why `mcp=0` is a real choice, not a block)
 
 **Verified 2026-06-29.** Before trusting any `mcp=0` result we confirmed the MCP tools are actually offered to the model in the benchmark harness:
