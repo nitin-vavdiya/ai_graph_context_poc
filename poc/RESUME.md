@@ -34,4 +34,4 @@ bash poc/run.sh --tasks A2
 At equal `oracle_pass`, do **cgc / both** use fewer tokens + tool-calls than **baseline**? And on **A2** (cross-repo) does cgc find the consumer while baseline struggles and serena can't span? Details: [`TEST-PLAN.md`](TEST-PLAN.md) §6.
 
 ## If you forget anything
-- What/why: [`benchmark-design.md`](benchmark-design.md) §0 · The tasks: [`tasks/README.md`](tasks/README.md) · Commands/schema/gotchas: [`REFERENCE.md`](REFERENCE.md) · What results mean so far: [`FINDINGS.md`](FINDINGS.md) · Hub: [`README.md`](README.md).
+- **Conclusions (start here): [`CONCLUSIONS.md`](CONCLUSIONS.md)** · What/why: [`benchmark-design.md`](benchmark-design.md) §0 · The tasks: [`tasks/README.md`](tasks/README.md) · Commands/schema/gotchas: [`REFERENCE.md`](REFERENCE.md) · Evidence trail: [`FINDINGS.md`](FINDINGS.md) · Hub: [`README.md`](README.md).

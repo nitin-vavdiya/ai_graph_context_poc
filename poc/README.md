@@ -16,7 +16,8 @@ Hands-on validation of the two finalized tools (**CodeGraphContext** + **Serena*
 
 - [`TEST-PLAN.md`](TEST-PLAN.md) — **test plan & measurement plan**: objective, hypothesis, the 4 arms, test cases, procedure, what we measure and how we reach a verdict, execution schedule, validity limits.
 - [`REFERENCE.md`](REFERENCE.md) — **one-stop reference**: command cheatsheet, arms + isolation, results/metrics schema, how to add a task, file map, versions, and gotchas.
-- [`FINDINGS.md`](FINDINGS.md) — **running findings log**: what the results mean so far (interim conclusions, updated after each task).
+- [`CONCLUSIONS.md`](CONCLUSIONS.md) — **★ start here**: one-page synthesis — verdict, results, cost/quality matrices, methodology lessons, recommendation.
+- [`FINDINGS.md`](FINDINGS.md) — **running findings log**: the full evidence trail behind the conclusions (per-task, chronological).
 - [`benchmark-design.md`](benchmark-design.md) — the plan: Phase-0 enrichment + the 4-arm benchmark (arms, oracle, **isolation §4.5**, gates). **New to this? Start at §0 "In plain terms".**
 - [`SETUP.md`](SETUP.md) · [`SETUP-REPORT.md`](SETUP-REPORT.md) — reproducible setup runbook and the as-built record.
 - [`tasks/`](tasks/) — the benchmark task corpus ([`tasks/README.md`](tasks/README.md), [`tasks/tasks.jsonl`](tasks/tasks.jsonl), `tasks/fixtures/`).
