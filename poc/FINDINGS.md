@@ -2,7 +2,10 @@
 
 Interim conclusions as the benchmark executes. Per-cell numbers live in [`runs/<TASK>.md`](runs/); metric mechanics in [`REFERENCE.md`](REFERENCE.md) §3. This file records what the results *mean*, updated after each task.
 
-## Status as of R1 (×2) + R2 (×2) — single-repo tasks only
+## Status as of R1 (×2) + R2 (×2) + R3 (×1) — single-repo tasks only
+
+> **R3 update:** first task with failures — cgc and serena did not fix it, baseline and both did. The failures are **not arm-driven** (the graph arm `both` passed; the non-graph `baseline` passed; `mcp=0` everywhere) — they are task difficulty + run variance. Two sharper lessons: (a) **`oracle_pass` is itself noisy on hard tasks** (a single run gave a 50% pass rate mapping to no arm) → hard tasks need a multi-run pass *rate*, not one pass/fail; (b) **failing runs cost more** (wrong path = more turns), so cost and correctness are entangled — never compare cost across a mix of pass/fail cells. Detail: [`runs/R3.md`](runs/R3.md).
+
 
 **Nothing so far proves any cost reduction from cgc or serena.** Three points:
 
