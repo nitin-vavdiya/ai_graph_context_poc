@@ -50,7 +50,9 @@ while [ $# -gt 0 ]; do case "$1" in
 wants() { [ -z "$2" ] || echo ",$2," | grep -q ",$1,"; }
 
 mkdir -p "$OUT" "$RUNS"
-RESULTS="$OUT/results.csv"
+# --dry is a plumbing test; never let it clobber real results or truncate real
+# transcripts. Route dry output to separate files.
+RESULTS="$OUT/results.csv"; [ "$DRY" = 1 ] && RESULTS="$OUT/results.dry.csv"
 [ -f "$RESULTS" ] || echo "ts,task,arm,is_error,oracle_pass,completeness,tool_calls,mcp_tool_calls,num_turns,in_tokens,out_tokens,cache_read,duration_ms,cost_usd" > "$RESULTS"
 
 # ---- repo snapshot / restore (file-based; bash 3.2 has no assoc arrays) ------
@@ -67,6 +69,22 @@ restore_repo() { # $1 = repo path
   git -C "$r" ls-files --others --exclude-standard 2>/dev/null | sort > "$OUT/.untracked_now_$b"
   comm -13 "$OUT/.untracked_base_$b" "$OUT/.untracked_now_$b" \
     | grep -vE '^(\.serena/|documents-latest/)' | while read -r f; do rm -f "$r/$f"; done
+}
+# Belt-and-suspenders: assert the repo matches its snapshot (no prior cell's
+# edits leaked in). Tracked files must equal the snapshot; the only allowed
+# untracked files are the pre-existing base set + preserved data dirs.
+# Returns 1 and prints a loud warning if contaminated. $2 = phase label.
+assert_pristine() { # $1 = repo path, $2 = label
+  local r="$1" lbl="$2" b snap dirty extra; b=$(basename "$1"); snap=$(cat "$OUT/.snap_$b")
+  dirty=$(git -C "$r" diff "$snap" --name-only -- . 2>/dev/null | tr '\n' ' ')
+  git -C "$r" ls-files --others --exclude-standard 2>/dev/null | sort > "$OUT/.untracked_chk_$b"
+  extra=$(comm -13 "$OUT/.untracked_base_$b" "$OUT/.untracked_chk_$b" \
+    | grep -vE '^(\.serena/|documents-latest/)' | tr '\n' ' ')
+  if [ -n "$dirty" ] || [ -n "$extra" ]; then
+    echo "  ⚠ NOT PRISTINE [$b/$lbl] — tracked-changed=[$dirty] extra-untracked=[$extra] (cross-cell contamination!)"
+    return 1
+  fi
+  echo "  pristine [$b/$lbl] ✓"
 }
 
 # ---- per-task setup / canonical solution / oracle ---------------------------
@@ -203,9 +221,11 @@ for i in $(seq 0 $((NTASK-1))); do
     echo "  boundary: built-in tools ALLOWED | MCP=$([ -n "$(arm_mcp "$arm")" ] && basename "$(arm_mcp "$arm")" || echo none) | add-dir=${repos[*]}"
 
     restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"
+    assert_pristine "$RND/cashbot-go" "pre-$arm"; assert_pristine "$RND/ai-server" "pre-$arm"
     setup_task
 
-    cell="$OUT/${id}_${arm}"; log="$cell.jsonl"; : > "$log"
+    sfx=""; [ "$DRY" = 1 ] && sfx=".dry"
+    cell="$OUT/${id}_${arm}${sfx}"; log="$cell.jsonl"; : > "$log"
     if [ "$DRY" = 1 ]; then
       echo "  [dry] skipping Claude; applying canonical solution"
       apply_solution || echo "  [dry] no auto-solution for $id (oracle expected to fail)"
@@ -225,7 +245,7 @@ for i in $(seq 0 $((NTASK-1))); do
     restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"
     echo
   done
-  gen_run_doc "$i"
+  [ "$DRY" = 1 ] || gen_run_doc "$i"   # dry is plumbing-only; don't overwrite committed run docs
   echo
 done
 
