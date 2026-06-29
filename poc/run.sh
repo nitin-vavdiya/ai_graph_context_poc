@@ -103,6 +103,7 @@ apply_solution() { # --dry only: produce a correct solution to exercise the pass
   fi
   case "$TID" in
     A2) perl -0pi -e 's/(\tResultURL\s+\*string\s+`json:"resultURL,omitempty"`\n)/$1\tEngineVersion  *string `json:"engineVersion,omitempty"`\n/' "$RND/cashbot-go/pkg/model/services/response.go" ;;
+    A3) perl -0pi -e 's/(\tResultURL\s+\*string\s+`json:"resultURL,omitempty"`\n)/$1\tTaskDuration  *int64 `json:"taskDuration,omitempty"`\n/' "$RND/cashbot-go/pkg/model/services/response.go" ;;
     *) return 1 ;;
   esac
 }
@@ -118,6 +119,12 @@ oracle() { # sets globals ORACLE_PASS, COMPLETENESS, NOTE
       grep -q 'json:"engineVersion' "$cg/pkg/model/services/response.go" && COMPLETENESS=1
       ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) && [ "$COMPLETENESS" = 1 ] && ORACLE_PASS=1
       NOTE="engineVersion_field=$COMPLETENESS" ;;
+    A3)
+      # cross-repo retrieval: the new field lives ONLY in ai-server (unmounted).
+      # ground truth = taskDuration, added to ai-server DocumentResponse.
+      grep -q 'json:"taskDuration' "$cg/pkg/model/services/response.go" && COMPLETENESS=1
+      ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) && [ "$COMPLETENESS" = 1 ] && ORACLE_PASS=1
+      NOTE="taskDuration_field=$COMPLETENESS" ;;
   esac
 }
 

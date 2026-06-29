@@ -12,6 +12,18 @@ Interim conclusions as the benchmark executes. Per-cell numbers live in [`runs/<
 
 Everything below is the evidence trail that leads here.
 
+## A3 — the redesign that actually forces the cross-repo question (built 2026-06-29)
+
+A2 failed to test the hypothesis because both repos were mounted (grep spans them) and the answer was local. **A3 fixes both:**
+
+- **Only the run repo is mounted.** A3 sets `repos: ["cashbot-go"]`, so `--add-dir` gives the agent cashbot-go only. ai-server is **off-disk** — grep/read cannot reach it. (serena indexes cwd only, so it's blind to ai-server too.)
+- **The answer lives only in the unmounted repo.** A real producer change was seeded: ai-server's `DocumentResponse` callback model gained a field **`taskDuration`** (ai-server commit `8f404d9`). It occurs **0× in cashbot-go**. The task asks the agent to decode "the new field ai-server now sends" without naming it — so it must *retrieve* the field name/type from ai-server's model.
+- **Only the graph can bridge it.** ai-server was re-indexed into Neo4j, so cgc's `find_code`/cypher can return `DocumentResponse.source` (which contains `taskDuration`) even though the repo isn't on disk. Verified: `MATCH (c:Class {name:'DocumentResponse'}) RETURN c.source CONTAINS 'taskDuration'` → TRUE.
+
+**Expected discriminator:** cgc / both → `mcp>0`, find `taskDuration`, PASS. baseline / serena → cannot reach ai-server, must guess → FAIL (or add a wrong-named field). This is the first task that should make the graph earn its keep.
+
+**⚠ Load-bearing setup (A3 breaks without it):** (1) ai-server commit `8f404d9` must be present (the `taskDuration` field); (2) ai-server must be **re-indexed into Neo4j** after that commit (`codegraphcontext --database neo4j index groundx-rnd/ai-server --force`). If Neo4j is wiped or ai-server is reset, redo both before running A3. A2 is left unchanged for contrast.
+
 ## Tool-availability verification (why `mcp=0` is a real choice, not a block)
 
 **Verified 2026-06-29.** Before trusting any `mcp=0` result we confirmed the MCP tools are actually offered to the model in the benchmark harness:
