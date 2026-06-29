@@ -12,11 +12,12 @@ uv tool install -p 3.13 serena-agent
 # index the 6 corpus repos into Neo4j (per-repo): codegraphcontext --database neo4j index groundx-rnd/<repo>
 uv run --with neo4j python poc/enrich/enrich.py       # Phase-0: add cross-repo CALLS_SERVICE edges from C4
 
-# --- pre-flight (no tokens) ---
+# --- pre-flight ---
 docker ps --filter name=cgc-neo4j                      # Neo4j up?
-docker exec cgc-neo4j cypher-shell -u neo4j -p poctestpassword "MATCH ()-[r:CALLS_SERVICE]->() RETURN count(r)"  # expect 4
-command -v gopls                                       # Serena Go arm
-bash poc/dryrun-isolation.sh                           # prove arm isolation (4 arms pass)
+docker exec cgc-neo4j cypher-shell -u neo4j -p poctestpassword "MATCH ()-[r:CALLS_SERVICE]->() RETURN count(r)"  # expect 4 (no tokens)
+command -v gopls                                       # Serena Go arm (no tokens)
+bash poc/dryrun-isolation.sh                           # prove arm isolation — server NAMES only (4 trivial Claude calls)
+bash poc/probe-mcp.sh                                  # prove MCP tools are CALLABLE — forces a real mcp__* call (3 Claude calls); MUST pass before trusting any mcp=0
 
 # --- run the benchmark (paced one task at a time) ---
 bash poc/run.sh --dry                                  # validate plumbing, no Claude calls
@@ -130,7 +131,8 @@ poc/
   SETUP.md             reproducible setup runbook
   SETUP-REPORT.md      as-built record (decisions, problems/fixes, verification)
   run.sh               benchmark runner (per-cell setup/launch/oracle/restore + run docs)
-  dryrun-isolation.sh  pre-flight: prove each arm loads only its own MCP
+  dryrun-isolation.sh  pre-flight: prove each arm loads only its own MCP (server NAMES, not callability)
+  probe-mcp.sh         pre-flight: prove each arm's MCP tools are actually CALLABLE (forces a real mcp__* call)
   docker-compose.yml   local Neo4j (cgc-neo4j)
   enrich/enrich.py     Phase-0: C4 workspace.dsl -> CALLS_SERVICE edges in Neo4j
   mcp/                 per-arm MCP configs: codegraphcontext.json, serena.json, both.json

@@ -9,8 +9,9 @@ cd /Users/nitin/projects/groundx/ai_graph_context_poc
 
 # 0. Pre-flight
 docker compose -f poc/docker-compose.yml up -d        # in case Neo4j stopped over the weekend
-bash poc/dryrun-isolation.sh                           # 4 trivial Claude calls — must show all 4 arms PASS
-#    also confirms Claude auth/limits are live before spending on real cells
+bash poc/dryrun-isolation.sh                           # isolation: each arm loads only its own MCP server NAMES (4 trivial Claude calls)
+bash poc/probe-mcp.sh                                  # callability: forces a real mcp__* call per arm — MUST pass, else mcp=0 is meaningless
+#    together they confirm Claude auth/limits are live AND the graph/LSP tools actually work before spending on real cells
 
 # 1. Step 1 — R1 (4 arms)
 bash poc/run.sh --tasks R1

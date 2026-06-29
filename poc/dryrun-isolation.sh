@@ -2,10 +2,17 @@
 # Dry-run isolation check for the 4 benchmark arms.
 #
 # This does NOT run the benchmark. It starts each arm for a single trivial turn
-# and reads the `system/init` event Claude Code emits, which authoritatively
-# lists the MCP servers loaded for that run. It then asserts each arm loaded
-# EXACTLY its intended servers and nothing else — proving the arms cannot see
-# each other's tools, and that no stray MCP (claude-mem, caveman, chrome) leaks.
+# and reads the `system/init` event Claude Code emits, which lists the MCP
+# server NAMES configured for that run. It then asserts each arm loaded EXACTLY
+# its intended servers and nothing else — proving the arms cannot see each
+# other's tools, and that no stray MCP (claude-mem, caveman, chrome) leaks.
+#
+# SCOPE / LIMITATION: this checks which servers are CONFIGURED, not whether their
+# tools are CALLABLE. The init snapshot always shows servers as status="pending"
+# with zero mcp__ tools even when they connect and work moments later, so a PASS
+# here does NOT prove the graph/LSP tools actually function. For that, run
+# `poc/probe-mcp.sh`, which forces a real mcp__* tool call and asserts it lands.
+# Pre-flight = BOTH scripts (isolation here + callability there).
 #
 # Isolation controls applied to every arm (same on all → only MCP config varies):
 #   --strict-mcp-config         only MCP servers from --mcp-config (none for baseline)
