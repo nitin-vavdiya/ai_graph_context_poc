@@ -94,3 +94,14 @@ Prompted by the question "how do you ensure all four arms produced the same/qual
 - **A2/A3:** tighten the oracle to assert the field *type* (`*string` + `omitempty`), not just the json tag.
 - **A4:** score *precision* (penalize wrong files), not just recall.
 - **General:** `poc/quality-audit.sh <TASK>` is now part of result review — run it before trusting any cross-arm comparison.
+
+## Fixes applied before the next fresh run (2026-06-29)
+
+The quality audit above drove four harness fixes (all dry-run validated):
+
+1. **R1–R3 anti-gaming — hide `.git` from the agent.** `run.sh` now moves `cashbot-go/.git` aside for the duration of the `claude -p` call (restored before the oracle/restore, and by the EXIT trap on crash). Setup still uses git *before* hiding. With no `.git`, the agent cannot `git checkout`/`log`/`stash` to recover the shipped fix — it must genuinely fix the code. (Committing the bug was insufficient: the fix lives throughout history, so `git checkout <fixcommit>` would still recover it; only removing VCS access works.)
+2. **A2 oracle — assert pointer type.** Now requires `*string` + `json:"engineVersion,omitempty"`, not just the json tag (catches the baseline `string` quality miss).
+3. **A3 oracle — assert pointer int.** Requires `*int`/`*int64` + `json:"taskDuration,omitempty"`.
+4. **A4 — fixed ground truth + diagnostic precision.** Ground truth regenerated at the *stable* transitive closure (`CALLS*1..12` → 30 files; depth-5 had undercounted at 29). Recall ≥0.8 still gates PASS; **precision is now computed (from list-only answer lines) and reported as a diagnostic, but NOT gated** — the GT is the graph's *static* CALLS closure, which misses dynamic dispatch (so an agent may legitimately list more) and is circular-favoring cgc, making a precision gate unfair. Precision appears in the result NOTE for human review.
+
+**Quality-review process going forward:** after any run, `bash poc/quality-audit.sh <TASK>` is mandatory before trusting cross-arm comparisons — it shows files changed, `_test.go`/git-gaming violations, edit type, and mcp usage per arm. "Passed" is necessary but not sufficient.

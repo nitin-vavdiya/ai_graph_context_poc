@@ -1,6 +1,7 @@
 cmd/prompttest/agent_test.go
 cmd/prompttest/chunks_test.go
 cmd/prompttest/figures_test.go
+cmd/prompttest/filenames_test.go
 cmd/prompttest/forms_test.go
 cmd/prompttest/paragraphs_test.go
 cmd/prompttest/table_figures_test.go

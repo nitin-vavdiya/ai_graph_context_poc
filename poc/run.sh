@@ -68,6 +68,21 @@ park_repo() { # $1 = repo basename
 }
 unpark_all() { local r; for r in $PARKED; do [ -d "$PARKDIR/$r" ] && mv "$PARKDIR/$r" "$RND/$r"; done; PARKED=""; }
 
+# ---- VCS hiding: move cashbot-go/.git aside ONLY while the agent runs, so tasks
+# cannot be solved via git history (git checkout/log/stash recovers the shipped
+# fix — confirmed gaming on R3). Hidden after setup (which needs git) and the
+# pre-cell restore; restored before the oracle/post-cell restore (which need git).
+GITHID=""
+hide_git() { # $1 = repo path
+  [ -d "$1/.git" ] && mv "$1/.git" "$1/.git.hidden" && GITHID="$1"
+}
+unhide_git() {
+  [ -n "$GITHID" ] || return 0
+  rm -rf "$GITHID/.git" 2>/dev/null            # drop any .git the agent created (e.g. git init)
+  mv "$GITHID/.git.hidden" "$GITHID/.git" 2>/dev/null
+  GITHID=""
+}
+
 # ---- repo snapshot / restore (file-based; bash 3.2 has no assoc arrays) ------
 # All three are no-ops if the repo dir is absent (e.g. parked off-disk).
 snapshot_repo() { # $1 = repo path
@@ -133,26 +148,38 @@ oracle() { # sets globals ORACLE_PASS, COMPLETENESS, NOTE
   fi
   case "$TID" in
     A2)
-      grep -q 'json:"engineVersion' "$cg/pkg/model/services/response.go" && COMPLETENESS=1
+      # QUALITY: require the field be a POINTER + omitempty (matches the struct's
+      # other optional fields), not just the json tag — see FINDINGS quality audit.
+      grep -qE '\*string[^`]*`json:"engineVersion,omitempty"`' "$cg/pkg/model/services/response.go" && COMPLETENESS=1
       ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) && [ "$COMPLETENESS" = 1 ] && ORACLE_PASS=1
-      NOTE="engineVersion_field=$COMPLETENESS" ;;
+      NOTE="engineVersion_ptr_field=$COMPLETENESS" ;;
     A3)
       # cross-repo retrieval: the new field lives ONLY in ai-server (unmounted).
-      # ground truth = taskDuration, added to ai-server DocumentResponse.
-      grep -q 'json:"taskDuration' "$cg/pkg/model/services/response.go" && COMPLETENESS=1
+      # ground truth = taskDuration (Optional[int]); QUALITY: require pointer int + omitempty.
+      grep -qE '\*int(64)?[^`]*`json:"taskDuration,omitempty"`' "$cg/pkg/model/services/response.go" && COMPLETENESS=1
       ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) && [ "$COMPLETENESS" = 1 ] && ORACLE_PASS=1
-      NOTE="taskDuration_field=$COMPLETENESS" ;;
+      NOTE="taskDuration_ptr_field=$COMPLETENESS" ;;
     A4)
-      # impact analysis: score RECALL of the ground-truth caller files present
-      # in the agent's final answer. Efficiency (tokens/turns) read separately.
-      local gt="$ROOT/poc/tasks/fixtures/A4_impact_files.txt" ans total found fp
+      # impact analysis. PASS gates on RECALL of the ground-truth (graph-closure)
+      # caller files >=0.8. PRECISION is computed and reported as a DIAGNOSTIC only,
+      # NOT gated: the ground truth is the graph's *static* CALLS closure, which
+      # (a) misses dynamic dispatch (interface/func-value calls an agent may still
+      # find) and (b) is circular-favoring cgc — so penalizing "extra" files would
+      # be unfair. Precision is extracted from list-only lines (the requested format).
+      local gt="$ROOT/poc/tasks/fixtures/A4_impact_files.txt" ans total found fp pred predn bad
       ans=$(jq -rs '[.[]|select(.type=="result")|.result]|last // ""' "$log" 2>/dev/null)
       total=$(grep -c . "$gt"); found=0
       while IFS= read -r fp; do [ -z "$fp" ] && continue
         printf '%s' "$ans" | grep -qF "$fp" && found=$((found+1)); done < "$gt"
+      pred=$(printf '%s' "$ans" | grep -oE '^[[:space:]]*[-*]?[[:space:]]*[a-z][a-zA-Z0-9_./-]*\.go[[:space:]]*$' | grep -oE '[a-z][a-zA-Z0-9_./-]*\.go' | sort -u)
+      predn=$(printf '%s\n' "$pred" | grep -c .); bad=0
+      while IFS= read -r fp; do [ -z "$fp" ] && continue
+        grep -qxF "$fp" "$gt" || bad=$((bad+1)); done <<EOF
+$pred
+EOF
       COMPLETENESS=$found
       awk -v f="$found" -v t="$total" 'BEGIN{exit !(t>0 && f/t>=0.8)}' && ORACLE_PASS=1
-      NOTE="impact_recall=$found/$total" ;;
+      NOTE="recall=$found/$total prec=$((predn-bad))/${predn}(diag)" ;;
   esac
 }
 
@@ -243,7 +270,7 @@ gen_run_doc() { # $1 = task index
 # ---- main loop --------------------------------------------------------------
 snapshot_repo "$RND/cashbot-go"
 snapshot_repo "$RND/ai-server"
-trap 'unpark_all; restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"' EXIT
+trap 'unhide_git; unpark_all; restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"' EXIT
 
 NTASK=$(jq -s 'length' "$TASKS")
 echo "Runner: $NTASK tasks x ${#ARM_NAMES[@]} arms  (dry=$DRY)"; echo
@@ -284,8 +311,10 @@ for i in $(seq 0 $((NTASK-1))); do
       IS_ERROR=dry; NUM_TURNS=0; IN_TOK=0; OUT_TOK=0; CACHE=0; DUR=0; COST=0; TOOLS=0; MCPTOOLS=0
     else
       mcp="$(arm_mcp "$arm")"; mcpflag=(); [ -n "$mcp" ] && mcpflag=(--mcp-config "$mcp")
+      hide_git "$RND/cashbot-go"   # no VCS recovery while the agent runs (anti-gaming)
       ( cd "$RND/$(basename "$run_dir")" && claude -p "$prompt" "${ISO[@]}" "${mcpflag[@]}" "${add[@]}" \
           --output-format stream-json --verbose --max-turns "$MAXTURNS" ) > "$log" 2> "$cell.err"
+      unhide_git
       parse_metrics "$log"
     fi
 
