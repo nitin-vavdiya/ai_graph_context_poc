@@ -2,6 +2,16 @@
 
 Interim conclusions as the benchmark executes. Per-cell numbers live in [`runs/<TASK>.md`](runs/); metric mechanics in [`REFERENCE.md`](REFERENCE.md) §3. This file records what the results *mean*, updated after each task.
 
+## ★★ Updated headline (after A4 — the graph WAS used and CAN help)
+
+A4 (impact analysis — list all transitive callers of `PrepareStep`, an answer that is **0% greppable by name**) is the first task where the graph/LSP were actually used, and it revises the picture below:
+
+- **Adoption ceiling broken — conditionally.** With a task where grep obviously can't start *and* an explicit steer to use code-graph/symbol tools, all three tool arms called their MCP tools (cgc 8, serena 63, both 5). Neither the hard task nor the steer alone sufficed in R1–A3; both together did.
+- **The graph, used well, is ~4× cheaper at equal completeness.** `both` produced the full 29/29 impact set in 5 graph calls / 15 turns / **$1.51**; baseline traced it by hand to 28/29 but cost **$5.90** / 64 turns. The graph wins by expressing transitive reachability as one `CALLS*` query instead of dozens of manual grep+read steps.
+- **Three big caveats.** (1) baseline still reached 28/29 — the graph is an efficiency win here, not a capability the agent lacks. (2) "Graph available" ≠ "graph efficient": `cgc`-alone had the graph, used it, and still cost $6.30 — as much as baseline; the win depends on *how* it's used. (3) Single run per arm with large known variance — "4×" is indicative, not yet statistically firm.
+
+**Net:** the graph's value is real but narrow and conditional — it shows up on **structural/transitive queries at scale, when the agent is steered to use it and expresses the query structurally**. On ordinary localize-and-edit tasks (R1–A3) with code on disk, the model rationally prefers grep and the graph goes unused. Full A4 detail: [`runs/A4.md`](runs/A4.md).
+
 ## ★ Headline conclusion (after R1–R3 + A2 pass 1)
 
 **As wired, this benchmark does not demonstrate a graph/LSP benefit — and it revealed why.** Across every cell run (R1×3, R2×3, R3×2, A2×1 = 36 cells), **the model never once called a graph or LSP tool (`mcp=0` everywhere)**, even on A2, the cross-repo task designed to require the graph, where cgc had 25 graph tools offered and used none. All arms — including baseline — solved every task with built-in `grep`/`find`/`read`/`edit`, and all passed.
