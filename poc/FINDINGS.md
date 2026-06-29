@@ -20,5 +20,13 @@ The only task designed to trigger all three is **A2 (cross-repo)**: baseline has
 ### Bottom line
 R1/R2 prove the **harness is sound and isolation is clean** — not that the graph saves cost. The claim stands or falls on **A2**.
 
+### Why three near-identical in-repo tasks (R1–R3)?
+They look alike because they *behaved* alike (`mcp=0`, easy-locate), but they are three distinct real bugs — R1 MCP response decode (`mcp.go`, stresses *time*), R2 shadowed-tool filtering (`pkg/mcp/mcp.go`, stresses *quality*), R3 OAuth URL normalization (`oauth.go`, stresses *time*). The multiplicity is deliberate:
+1. **They are the control / null baseline.** The hypothesis is "graph helps *locate* code." R1–R3 are cases where locating is trivial (one grep → one file), so the graph *should not* help. Showing no benefit here is what lets us attribute any A2 benefit to the **cross-repo structure**, not to "graph good everywhere."
+2. **One null is an anecdote; three is a pattern.** Three different bug types / files / packages all showing the same null makes the in-repo result robust against a per-bug fluke.
+3. **They estimate the noise floor.** Repeated R-runs are how we learned the run-to-run cost swing is large — that number is the yardstick A2's effect must beat.
+
+**Caveat — the design is lopsided: three in-repo control tasks vs one cross-repo treatment task (A2).** The entire verdict leans on a single treatment case. If A2 shows a strong effect, that is suggestive, not conclusive — a general "graph wins cross-repo" claim would need **additional cross-repo tasks** to confirm (the design mentions an `A1` cross-repo control that could be added). Treat a positive A2 as a strong lead, not proof of a general result.
+
 ### Methodology consequence
 Because cost on easy tasks is dominated by `cache_read ≈ context-size × turns` (turn count is random per run), **rank arms by `oracle_pass` then `cost_usd`, never by `cache_read`/`total billable`, and never off a single run.** Run the decisive task (A2) **≥3× and take the median** so a true effect can clear the noise. (Details: [`REFERENCE.md`](REFERENCE.md) §3.)
