@@ -142,6 +142,17 @@ oracle() { # sets globals ORACLE_PASS, COMPLETENESS, NOTE
       grep -q 'json:"taskDuration' "$cg/pkg/model/services/response.go" && COMPLETENESS=1
       ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) && [ "$COMPLETENESS" = 1 ] && ORACLE_PASS=1
       NOTE="taskDuration_field=$COMPLETENESS" ;;
+    A4)
+      # impact analysis: score RECALL of the ground-truth caller files present
+      # in the agent's final answer. Efficiency (tokens/turns) read separately.
+      local gt="$ROOT/poc/tasks/fixtures/A4_impact_files.txt" ans total found fp
+      ans=$(jq -rs '[.[]|select(.type=="result")|.result]|last // ""' "$log" 2>/dev/null)
+      total=$(grep -c . "$gt"); found=0
+      while IFS= read -r fp; do [ -z "$fp" ] && continue
+        printf '%s' "$ans" | grep -qF "$fp" && found=$((found+1)); done < "$gt"
+      COMPLETENESS=$found
+      awk -v f="$found" -v t="$total" 'BEGIN{exit !(t>0 && f/t>=0.8)}' && ORACLE_PASS=1
+      NOTE="impact_recall=$found/$total" ;;
   esac
 }
 
