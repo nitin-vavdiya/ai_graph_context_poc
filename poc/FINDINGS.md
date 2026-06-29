@@ -2,6 +2,27 @@
 
 Interim conclusions as the benchmark executes. Per-cell numbers live in [`runs/<TASK>.md`](runs/); metric mechanics in [`REFERENCE.md`](REFERENCE.md) §3. This file records what the results *mean*, updated after each task.
 
+## ☑ Fresh validated run — all 24 cells, post-fix (2026-06-29 evening)
+
+First full run with the anti-gaming + quality fixes (`.git` hidden during the agent call; pointer-type A2/A3 oracles; A4 recall + diagnostic precision). Prior results parked to `poc/results/_archive_pre-fix/`.
+
+| task | baseline | cgc | serena | both | what it shows |
+|---|---|---|---|---|---|
+| R1 | ✅ mcp0 | ✅ mcp0 | ✅ mcp0 | ✅ mcp0 | easy in-repo — graph unused, all pass |
+| R2 | ✅ mcp0 | ✅ mcp0 | ✅ mcp0 | ✅ mcp0 | same |
+| R3 | ❌ | ❌ | ❌ | ❌ | **0/4 genuine** — gaming blocked (`.git` hidden); all made real `oauth.go` edits but didn't land the hard OAuth-normalization fix this run |
+| A2 | ✅ | ✅ | ❌ | ❌ | quality oracle bites — serena/both added the field but **not `*string`**, correctly failed |
+| A3 | ❌ | ✅ **mcp3** | ✅ mcp0 ⚠leak | ❌ | **cgc's graph win is the one clean positive**; serena passed via a leak (below); baseline/both failed |
+| A4 | ✅ 29/30 mcp0 | ✅ 29/30 mcp5 | ✅ 30/30 mcp64 | ✅ 30/30 mcp58 | graph+LSP genuinely used; all complete; costs **bunched $3.6–4.6** |
+
+### What this clean run establishes
+1. **Anti-gaming works; R3's old "all pass" was mostly git-gaming.** With `.git` hidden, R3 is genuinely 0/4 — arms make real edits but don't land the fix. (Correctness is noisy — a prior genuine serena run *did* pass R3 — so the honest read is "hard, low single-shot pass rate, no arm advantage.")
+2. **The quality oracle discriminates.** A2 now separates `*string` (pass) from `string` (fail): baseline/cgc pass, serena/both fail on type. "All passed" is gone.
+3. **Graph value is real but narrow; efficiency is NOT robust.** A3/cgc used the graph (`mcp=3`) to retrieve an off-disk symbol and pass where baseline failed — a genuine capability win. A4: graph/LSP used by all tool arms, all complete (29–30/30), **but the earlier "~4× cheaper" did NOT reproduce** — every A4 arm cost $3.6–4.6 this run (both was $4.59, not the earlier $1.51). The graph's *reliable* advantage is **completeness/capability on structural queries**, not lower cost; the cost win is run-dependent noise.
+
+### ⚠ Still-open harness bug: A3 isolation leaks
+A3/serena passed with `mcp=0` because `park_repo` moves ai-server to `poc/results/.parked/` — **inside readable space** — so the agent `find`s and `Read`s it; it also found a **stray second checkout** at `/Users/nitin/projects/groundx/log_analysis/code/groundx-rnd/ai-server`. So file-moving does **not** isolate (same lesson as A2/A3 v1–v2: a capable agent searches the whole filesystem). Only **cgc's A3 pass is trustworthy** (graph, not file). Robust isolation needs OS-level sandboxing (container / restricted-read permission mode), not parking. **Net A3:** cgc demonstrably retrieved off-disk code via the graph; baseline failed; serena's pass is an artifact; both didn't try the graph.
+
 ## ★★ Updated headline (after A4 — the graph WAS used and CAN help)
 
 A4 (impact analysis — list all transitive callers of `PrepareStep`, an answer that is **0% greppable by name**) is the first task where the graph/LSP were actually used, and it revises the picture below:
