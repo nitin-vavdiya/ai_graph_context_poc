@@ -2,6 +2,19 @@
 
 Interim conclusions as the benchmark executes. Per-cell numbers live in [`runs/<TASK>.md`](runs/); metric mechanics in [`REFERENCE.md`](REFERENCE.md) §3. This file records what the results *mean*, updated after each task.
 
+## TL;DR
+
+**Graph context is a capability/reliability win on a narrow set of high-value cases — cross-repo / off-disk retrieval and transitive impact (blast-radius) analysis — but NOT a general token-saver, and the agent won't use it unless the task forces it or it's explicitly steered.** Our POC and the 2023–2026 literature agree on this; the broad "graph cuts find-cost everywhere" hypothesis is not supported.
+
+- **Where it wins:** code not on local disk (POC A3: cgc passed 3/3 via the graph where grep-only arms only passed by leak), and transitive call-chain / impact sets grep can't trace cheaply (POC A4: same complete answer in ~5 graph queries vs serena's 60+ LSP recursions). Literature concurs (LocAgent, RANGER, StackRepoQA, GraphRAG-Bench).
+- **Where it doesn't:** everyday in-repo localize-and-fix with code on disk — grep already wins, the loaded graph sits idle (POC R1/R2/A2 `mcp=0`; CodeScaleBench: 8 graph calls / 602 runs).
+- **Cost:** no reliable token/$ savings — the "~4× cheaper" did not reproduce across runs, and the one external paper claiming ~10× savings was refuted in verification. Rank arms by correctness/capability, never single-run cost.
+- **cgc (graph) vs serena (LSP):** cgc wins for this POC's purpose — LSP needs source on disk so serena structurally can't do off-disk/cross-repo; on transitive queries cgc's one `CALLS*` query beats serena's recursive ref-lookups.
+- **Open:** the target regime (~100 repos / billions of LOC, where grepping everything is infeasible) is **untested here and unproven in the literature** — every confirmed source is single-repo. Biggest upside lives there, but it's still a bet.
+- **Verdict — worth using?** Conditionally yes: adopt selectively for cross-repo/blast-radius work, pair with grep (hybrid router), and steer the agent to it explicitly. Don't deploy it as a general layer or sell it on token cost.
+
+Full evidence below; one-page synthesis in [`CONCLUSIONS.md`](CONCLUSIONS.md); external-literature check in the "External validation" section.
+
 ## ☑ Fresh validated run — all 24 cells, post-fix (2026-06-29 evening)
 
 First full run with the anti-gaming + quality fixes (`.git` hidden during the agent call; pointer-type A2/A3 oracles; A4 recall + diagnostic precision). Prior results parked to `poc/results/_archive_pre-fix/`.
