@@ -4,7 +4,13 @@ _Head-to-head guidance from the parity probes and the benchmark. Evidence: [`03-
 
 ## Short answer
 
-For this POC's purpose — giving an AI agent retrieval over a **multi-repo** codebase — **CodeGraphContext (the graph) is the better fit than Serena (LSP)**, but only because of two capabilities LSP structurally lacks. For everything else, **neither beats grep**, and the honest recommendation is a **grep-first hybrid** that escalates to the graph on specific triggers.
+There is no single overall winner — it's conditional — but two calls are clear-cut:
+
+- **Serena (LSP) is the clear loser.** No task where it uniquely wins; it *reliably fails* A2 (0/3, worse than plain grep on on-disk code); the model invoked it in only 1 of 6 tasks. **If you add one tool, it is never the LSP.**
+- **CodeGraphContext (graph) is the clear winner *when a structural tool is needed*** — it is the only arm that can retrieve off-disk/cross-repo code (A3), which grep and LSP structurally cannot, and it needs far fewer tool calls for transitive traversal. cgc > serena, unambiguously.
+- **grep (baseline) is the workhorse** — it wins or ties every on-disk task (R1, R2, A2), is cheapest/competitive, and is what the model reaches for by default.
+
+So for this POC's purpose — giving an AI agent retrieval over a **multi-repo** codebase — the recommendation is a **grep-first hybrid**: default to grep, add **CodeGraphContext** as a narrow escalation for off-disk/cross-repo and deep-traversal queries, and steer the model to it explicitly. Do not adopt Serena.
 
 ## Capability parity (matched probes, identical task, only the tool differs)
 

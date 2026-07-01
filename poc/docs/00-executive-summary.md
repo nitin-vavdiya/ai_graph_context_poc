@@ -29,4 +29,4 @@ Per-arm average tokens (across A2/A3/A4, 9 runs each): baseline **2.5K in / 16.4
 
 ## Bottom line
 
-Adopt graph context **selectively**, for off-disk / cross-repo retrieval and deep impact analysis, paired with grep (a router that falls back to grep for on-disk work), and **only if the agent is explicitly told when to use it**. Do **not** deploy it as a general retrieval layer or justify it on token cost. See [`04-recommendation.md`](04-recommendation.md).
+Adopt graph context **selectively**, for off-disk / cross-repo retrieval and deep impact analysis, paired with grep (a router that falls back to grep for on-disk work), and **only if the agent is explicitly told when to use it**. Do **not** deploy it as a general retrieval layer or justify it on token cost. Between the two tools the call is clear-cut: **CodeGraphContext is the one to add; Serena (LSP) earns no place** — it uniquely won nothing and reliably failed A2. Full head-to-head: [`04-recommendation.md`](04-recommendation.md).
