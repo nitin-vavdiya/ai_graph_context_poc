@@ -1,6 +1,6 @@
 # Recommendation: CodeGraphContext vs Serena
 
-_Head-to-head guidance from the parity probes and the benchmark. Evidence: [`03-task-runs.md`](03-task-runs.md), [`../PARITY-RECHECK.md`](../PARITY-RECHECK.md). Single run (n=1); treat specifics as directional pending medians._
+_Head-to-head guidance from the parity probes and the benchmark. Evidence: [`03-task-runs.md`](03-task-runs.md), [`../PARITY-RECHECK.md`](../PARITY-RECHECK.md). A2/A3/A4 are 3-run medians; R1–R3 single-run._
 
 ## Short answer
 
@@ -23,7 +23,7 @@ For this POC's purpose — giving an AI agent retrieval over a **multi-repo** co
 
 **CodeGraphContext wins when:**
 - The relevant code is **not on the developer's disk** (another repo, not checked out) — a pre-built central index is the *only* thing that reaches it. This is the decisive, unique win (A3).
-- You need **transitive/structural traversal** (blast radius, "everything that calls X through any chain") — one graph query vs an LSP's dozens of recursive reference lookups. Cheaper and less error-prone (A4).
+- You need **transitive/structural traversal** (blast radius, "everything that calls X through any chain") — **far fewer tool calls**: 2–5 graph queries vs the LSP's 60–66 recursive reference lookups (it has no transitive operator). Note: fewer calls did **not** mean lower $ or tokens (A4 cost was noise-dominated; cgc's average cost was actually the highest) — the win is call-count and simplicity, not cost.
 - Index freshness/build cost matters at scale — tree-sitter indexing is far faster and needs no per-language server.
 
 **Serena wins when:**
@@ -35,7 +35,8 @@ For this POC's purpose — giving an AI agent retrieval over a **multi-repo** co
 
 - **Neither derives cross-repo runtime coupling from code.** The service-to-service edges (HTTP/webhook) came from a hand-authored C4 model. Don't expect either tool to trace "cashbot-go calls ai-server" from source.
 - **The model won't use either tool unless steered.** On 4 of 6 tasks the agent ignored both and used grep — including a cross-repo task and the arm that had *both* tools available (it still failed A3 by not calling the graph). A retrieval layer the model doesn't invoke is worthless.
-- **No token/cost win as a general layer.** The graph only saved cost on the one deep-traversal task, and even there traded a little recall.
+- **No token/cost win as a general layer.** Over 3 runs the graph saved nothing on cost — on the one deep-traversal task (A4) its *average* cost was the highest of the four arms. Its only reproducible efficiency edge is tool-call count.
+- **Serena's arm can actively hurt.** On A2 (cross-repo, both repos on disk) the Serena arm **failed all 3 runs** while grep-based arms mostly passed — adding the LSP tool correlated with worse outcomes on a task where grep sufficed.
 
 ## Recommendation
 

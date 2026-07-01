@@ -1,6 +1,6 @@
 # Task Definitions & Results
 
-_The six benchmark tasks and the full 24-cell result matrix. **Single validated run (n=1), 2026-07-01**, under the fixed harness ([`02-poc-setup.md`](02-poc-setup.md)). Medians (×3) on the discriminating cells are still pending. Raw data: `poc/results/results.csv`; per-cell tool traces: `poc/runs/*.md`._
+_The six benchmark tasks and the results, under the fixed harness ([`02-poc-setup.md`](02-poc-setup.md)). **R1–R3: single run** (stable). **A2/A3/A4: 3 runs each → medians + averages** (2026-07-01), since those are the discriminating cells and had run-to-run variance. Raw data: `poc/results/results.csv`; per-cell tool traces: `poc/runs/*.md`._
 
 ## Tasks
 
@@ -11,59 +11,56 @@ Two families: **R** = in-repo localize-and-fix (real historical bugs in `cashbot
 | **R1** | MCP response decode bug | cashbot-go | in-repo localize+fix | `go test` passes |
 | **R2** | shadowed partner MCP tool | cashbot-go | in-repo localize+fix | `go test` passes |
 | **R3** | OAuth resource-URL normalization | cashbot-go | in-repo localize+fix | `go test` passes |
-| **A2** | cross-repo field add, **both repos on disk** — add `engineVersion` to the webhook type | cashbot-go, ai-server | cross-repo retrieval when code is present | field is pointer+omitempty; `go build` |
-| **A3** | cross-repo field add, **ai-server PARKED off-disk** — mirror `taskDuration` from ai-server's model | cashbot-go (park ai-server) | **off-disk retrieval** — the code is only in the graph | `taskDuration *int64` + `go build` |
+| **A2** | cross-repo field add, **both repos on disk** (`engineVersion`) | cashbot-go, ai-server | cross-repo retrieval when code is present | field pointer+omitempty; `go build` |
+| **A3** | cross-repo field add, **ai-server PARKED off-disk** (`taskDuration`) | cashbot-go (park ai-server) | **off-disk retrieval** — code only in the graph | `taskDuration *int64` + `go build` |
 | **A4** | transitive impact set of `PrepareStep` | cashbot-go | **deep call-graph traversal** | recall ≥0.8 vs independent Go-SSA oracle (37 files) |
 
-A3 is the capability discriminator: the answer lives **only** in ai-server, which is physically removed from disk — so grep/LSP have nothing to read, and only a pre-built index can reach it. A4 is the efficiency/scale test: `PrepareStep` has 1 direct caller but many transitive ones, and none of the impact files contain the string "PrepareStep" (un-greppable by name).
+A3 is the capability discriminator: the answer lives **only** in ai-server, physically removed from disk — grep/LSP have nothing to read, only a pre-built index can reach it. A4 is the efficiency/scale test: `PrepareStep` has 1 direct caller but many transitive ones, none containing the string "PrepareStep" (un-greppable by name).
 
-## Results — full 24-cell matrix
+## Results — R1–R3 (single run)
 
-`pass` = oracle passed · `mcp` = graph/LSP tool calls the model made · `turns`/`dur`/`cost` from the run.
+| task | baseline | cgc | serena | both | note |
+|---|---|---|---|---|---|
+| R1 | ✅ | ✅ | ✅ | ✅ | all pass, **mcp=0** — structural tools available but unused |
+| R2 | ✅ | ✅ | ✅ | ✅ | all pass, mcp=0 |
+| R3 | ❌ | ❌ | ❌ | ❌ | all fail — hard task, discriminates nothing between arms |
 
-| task | arm | pass | mcp | turns | dur (s) | cost ($) |
+On in-repo localize-and-fix, every arm used grep/read and **never** called the graph or LSP. Baseline is competitive.
+
+## Results — A2/A3/A4 (3 runs → medians)
+
+`pass` = passes out of 3 · `mcp` = graph/LSP tool calls · tokens/cost are **averages** of the 3 runs.
+
+| task | arm | pass | mcp | avg in-tok | avg out-tok | avg cost $ |
 |---|---|---|---|---|---|---|
-| R1 | baseline | ✅ | 0 | 13 | 111 | 0.71 |
-| R1 | cgc | ✅ | 0 | 16 | 122 | 0.73 |
-| R1 | serena | ✅ | 0 | 20 | 215 | 1.14 |
-| R1 | both | ✅ | 0 | 17 | 136 | 0.99 |
-| R2 | baseline | ✅ | 0 | 24 | 230 | 1.98 |
-| R2 | cgc | ✅ | 0 | 21 | 319 | 1.96 |
-| R2 | serena | ✅ | 0 | 27 | 252 | 2.16 |
-| R2 | both | ✅ | 0 | 21 | 186 | 1.57 |
-| R3 | baseline | ❌ | 0 | 20 | 309 | 2.13 |
-| R3 | cgc | ❌ | 0 | 26 | 337 | 2.45 |
-| R3 | serena | ❌ | 0 | 18 | 318 | 1.98 |
-| R3 | both | ❌ | 0 | 20 | 345 | 2.22 |
-| A2 | baseline | ✅ | 0 | 11 | 40 | 0.93 |
-| A2 | cgc | ✅ | 0 | 12 | 52 | 0.49 |
-| A2 | serena | ❌ | 0 | 12 | 50 | 0.37 |
-| A2 | both | ✅ | 0 | 12 | 48 | 0.40 |
-| A3 | baseline | ❌ | 0 | 14 | 92 | 0.73 |
-| **A3** | **cgc** | **✅** | **2** | 21 | 137 | 1.27 |
-| A3 | serena | ❌ | 0 | 15 | 238 | 0.54 |
-| A3 | both | ❌ | 0 | 12 | 101 | 0.43 |
-| A4 | baseline | ✅ (37/37) | 0 | 59 | 1209 | 6.25 |
-| A4 | cgc | ✅ (34/37) | 5 | 42 | 656 | 3.19 |
-| A4 | serena | ✅ (37/37) | 65 | 69 | 808 | 4.17 |
-| A4 | both | ✅ (37/37) | 54 | 68 | 787 | 4.55 |
+| **A2** | baseline | 2/3 | 0 | 2,628 | 2,555 | 0.85 |
+| | cgc | 2/3 | 0 | 4,095 | 2,663 | 0.46 |
+| | **serena** | **0/3** | 0 | 3,265 | 2,614 | 0.37 |
+| | both | 3/3 | 0 | 3,903 | 2,445 | 0.48 |
+| **A3** | baseline | 0/3 | 0 | 2,623 | 5,562 | 0.71 |
+| | **cgc** | **2/3** | 2 (when pass) | 4,188 | 6,737 | 1.02 |
+| | serena | 0/3 | 0 | 3,733 | 4,977 | 0.41 |
+| | both | 0/3 | 0 | 4,515 | 5,091 | 0.49 |
+| **A4** | baseline | 3/3 | 0 | 2,255 | 41,152 | 6.63 |
+| | cgc | 3/3 | **2–5** | 1,733 | 36,804 | **7.03** |
+| | serena | 3/3 | **60–66** | 13,855 | 46,156 | 4.06 |
+| | both | 3/3 | 54–62 | 17,635 | 44,145 | 3.71 |
 
-Total run cost: **$43.33**.
+Per-arm overall averages (A2+A3+A4, 9 runs each): **baseline** in 2,502 / out 16,423 · **cgc** in 3,338 / out 15,401 · **serena** in 6,951 / out 17,915 · **both** in 8,684 / out 17,227. (Serena/both carry higher *input* tokens — MCP tool schemas + reference-lookup results in context; output is similar across arms.)
 
-## Per-task reads
+## Per-task reads (medians)
 
-- **R1, R2 — in-repo fix, all arms pass, `mcp=0`.** Every arm solved these with grep/read; the graph and LSP were available and **never called**. Baseline is competitive (cheapest or near it).
-- **R3 — all arms fail, `mcp=0`.** Not a tool signal — the OAuth-normalization fix was hard for all four arms equally (the model located the area but didn't produce a fix that passed the test). Included for completeness; it discriminates nothing between tools.
-- **A2 — cross-repo, both repos on disk.** baseline/cgc/both pass, all with `mcp=0` — even the graph/LSP arms solved it with grep, because the code was right there. Serena's arm failed (a flake; it also used no LSP). Takeaway: when the code is on disk, structural tools add nothing.
-- **A3 — the clean capability result.** Only **cgc** passed, and only because it invoked the graph (`mcp=2`, `find_code`) to read the off-disk symbol. baseline and serena failed (nothing to read). **The `both` arm failed with `mcp=0`** — it had the graph tool but the model didn't use it. Availability is not usage.
-- **A4 — graph cheaper, slightly less complete.** All arms passed the 0.8 recall gate. cgc was cheapest and fastest ($3.19 / 656 s / 5 graph calls) but recalled 34/37. baseline reached full 37/37 by brute grep-BFS at the highest cost ($6.25 / 59 turns). serena reached 37/37 via **65** `find_referencing_symbols` calls — the manual level-by-level BFS made concrete.
+- **A2 (cross-repo, both on disk).** baseline/cgc/both pass via grep (`mcp=0`), **serena reliably fails (0/3)** — adding the LSP tool correlated with worse outcomes on an on-disk task; no arm used a structural tool. Takeaway: when the code is on disk, structural tools add nothing (and Serena's arm hurt).
+- **A3 (off-disk) — the clean capability result.** **Only cgc passes (2/3), and passing is perfectly predicted by whether it invoked the graph** (pass ⟺ `mcp=2`; the one failure was `mcp=0`). baseline/serena fail all 3 (nothing to read). **The `both` arm fails all 3 with `mcp=0`** — it *had* the graph tool but never reached for it. Availability ≠ usage; the graph must be explicitly steered. cgc's passing runs cost ~2× the others' cheap failures ($1.02 avg vs $0.37–0.71) — capability isn't free.
+- **A4 (transitive impact) — all arms pass, but the n=1 "graph is cheaper" claim did NOT survive.** Every arm reached the 0.8 recall gate; **median recall is 37/37 for all**, including cgc (its 34/37 was a single-run outlier). On cost, **cgc is the *most* expensive on average ($7.03)**, not the cheapest — $/token is dominated by output tokens (baseline's output alone spanned 14K→92K across runs) and is essentially noise-dominated. The **only robust efficiency signal is tool-call count**: cgc issued **2–5** graph queries where serena made **60–66** reference lookups (it has no transitive operator — it BFS-es the call tree by hand). That call-count gap reproduces; the dollar/token advantage does not.
 
 ## Tool usage summary
 
-The model invoked a structural tool in **only 2 of 6 tasks**: the graph in A3 (2 calls), and the LSP/graph in A4 (heavy). On R1–R3 and A2 — every on-disk task — it used grep/read exclusively, `mcp=0`, despite the tools being available. Serena specifically was used in **1 of 6 tasks** (A4).
+Across all runs, the model invoked a structural tool in only **2 of 6 task types**: the graph in A3 (only cgc, and not even every run), and the graph/LSP in A4 (heavy). On R1–R3 and A2 — every on-disk task — it used grep/read exclusively (`mcp=0`) despite the tools being available. **Serena** was used by the model in **1 of 6 tasks** (A4).
 
-## Caveats on these numbers
+## Caveats
 
-- **n=1.** A3 (`both` failing by not calling the graph) and A4 (costs, cgc's 34 vs 37 recall) are the load-bearing cells and had historical variance; they need ×3 for medians before any figure is quoted as final.
-- **R3 failing across all arms** may indicate the task or its oracle is too strict; it should be reviewed before being read as a capability signal (it isn't one — it's flat across arms).
+- **A4 cost/tokens are noise-dominated** — do not quote any arm as "cheaper." The defensible A4 metric is tool-call count, not $ or tokens.
+- **R3 fails on all arms** — likely too strict a task/oracle; it discriminates nothing and should not be read as a capability signal.
 - A4 recall is graded against a **sound lower bound** (static call graph, 37 files); dynamic-dispatch-only callers are out of scope, so an arm is never penalized for finding more.
+- **n=3** for A2/A3/A4 (medians shown); R1–R3 remain n=1.
