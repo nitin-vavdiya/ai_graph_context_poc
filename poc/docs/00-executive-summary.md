@@ -23,7 +23,7 @@ Per-arm average tokens (across A2/A3/A4, 9 runs each): baseline **2.5K in / 16.4
 
 ## The load-bearing caveats
 
-- **Enterprise scale is untested.** This corpus is 6 repos; the motivating problem is ~100 repos / billions of lines. Nothing here proves the graph's advantage grows (or holds) at that scale.
+- **Enterprise scale is untested — twice over.** The index spans 6 repos, but **the tasks themselves span at most 2** (`cashbot-go ↔ ai-server`); 4 corpus repos are never exercised by a task. The motivating problem is ~100 repos with multi-hop dependency chains — untested both in repo *count* and in cross-repo *task depth* (the graph's edge was only stressed across a single service hop). Nothing here proves the advantage grows or holds at scale.
 - **The graph's cross-repo edges were hand-authored.** The one cross-repo *relationship* the graph could trace (service-to-service HTTP) came from a hand-written C4 model, not from parsing code — neither tool derives runtime cross-repo topology from source.
 - **Sample size.** A2/A3/A4 were run **3×** (medians reported); R1–R3 remain single-run. A4 cost/tokens are noise-dominated even at n=3 — treat them as ranges, not point estimates.
 

@@ -17,6 +17,8 @@ Two families: **R** = in-repo localize-and-fix (real historical bugs in `cashbot
 
 A3 is the capability discriminator: the answer lives **only** in ai-server, physically removed from disk — grep/LSP have nothing to read, only a pre-built index can reach it. A4 is the efficiency/scale test: `PrepareStep` has 1 direct caller but many transitive ones, none containing the string "PrepareStep" (un-greppable by name).
 
+> **Scope of the tasks (important).** The **edit target is always `cashbot-go`**. R1/R2/R3/A4 are **single-repo** (cashbot-go only); A2/A3 are **two-repo** (`cashbot-go` ← a field defined in `ai-server`). **No task spans more than 2 repos, and 4 of the 6 corpus repos** (`groundx-python`, `groundx-typescript`, `groundx-ai-middleware`, `groundx-ai-dashboard`) **are never exercised by any task.** The 6-repo scope is the *tool/index* scope (a realistic retrieval haystack + realistic index build cost), **not** the task scope — the cross-repo advantage was only stressed across a single service hop (cashbot-go ↔ ai-server). See caveats.
+
 ## Results — R1–R3 (single run)
 
 | task | baseline | cgc | serena | both | note |
@@ -64,3 +66,4 @@ Across all runs, the model invoked a structural tool in only **2 of 6 task types
 - **R3 fails on all arms** — likely too strict a task/oracle; it discriminates nothing and should not be read as a capability signal.
 - A4 recall is graded against a **sound lower bound** (static call graph, 37 files); dynamic-dispatch-only callers are out of scope, so an arm is never penalized for finding more.
 - **n=3** for A2/A3/A4 (medians shown); R1–R3 remain n=1.
+- **Cross-repo is only 2 repos deep.** Tasks span at most `cashbot-go ↔ ai-server`; the other 4 corpus repos are indexed but untested by any task. The graph's cross-repo edge was never stressed beyond one service hop — so "enterprise scale" (~100 repos, multi-hop dependency chains) is untested both in repo *count* and in cross-repo *task* complexity. A follow-up should add tasks whose answer chains through ≥3 repos.
