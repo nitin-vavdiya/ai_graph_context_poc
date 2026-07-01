@@ -2,7 +2,8 @@
 
 Hands-on comparison of **CodeGraphContext** (code knowledge graph / Neo4j) and **Serena** (LSP) against a plain-Claude-Code **baseline**, measured on real code-change tasks over the 6-repo `groundx-rnd/` corpus.
 
-> **Status:** complete (single validated run, 2026-07-01). The first head-to-head was found unreliable and discarded; the harness was fixed and re-run — see [`PARITY-RECHECK.md`](PARITY-RECHECK.md).
+> **Status:** complete (2026-07-01; A2/A3/A4 = 3-run medians, R1–R3 single-run). The first head-to-head was found unreliable and discarded; the harness was fixed and re-run — see [`PARITY-RECHECK.md`](PARITY-RECHECK.md).
+> **Verdict:** grep is the on-disk workhorse; **CodeGraphContext** is the pick when a structural tool is needed (off-disk/cross-repo retrieval, deep traversal); **Serena (LSP) earns no place**. Details in [`docs/00-executive-summary.md`](docs/00-executive-summary.md).
 
 ## Read the results — `docs/`
 

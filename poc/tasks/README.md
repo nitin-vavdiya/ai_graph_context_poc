@@ -29,9 +29,13 @@ Oracle is "run tests", so tasks live where tests run green locally (verified 202
 | **R1** | real bugfix | Partner MCP tool executions sometimes fail to decode the response (`failed to parse MCP execution response`) — fix it | `2548ec43` *Fix MCP execution response decoding* | `go test ./pkg/partner/partners/groundx` | Time (find) |
 | **R2** | real bugfix | Partner accounts are exposed a shadowed customer MCP tool — hide it for partners | `5be28304` *Hide shadowed customer MCP tool for partners* | `go test ./pkg/mcp` | Quality |
 | **R3** | real bugfix | Valid OAuth token requests wrongly rejected `invalid_grant` on resource-URL mismatch — fix normalization | `618633ec` *oauth fixes* | `go test ./pkg/partner/partners/groundx` | Time (find) |
-| **A2** | constructed | ai-server adds webhook field `engineVersion`; find the consuming service and add it | — (service-level coupling; no single-commit equivalent) | `go build ./pkg/...` + field present | Time (cross-repo find) |
+| **A2** | constructed | ai-server adds webhook field `engineVersion`; find the consuming service and add it (**both repos on disk**) | — (service-level coupling; no single-commit equivalent) | `go build ./pkg/...` + field present | Cross-repo find (on disk) |
+| **A3** | constructed | ai-server's `DocumentResponse` gains `taskDuration`; mirror it in cashbot-go's webhook type — **ai-server parked off-disk** | — (cross-repo, off-disk) | `taskDuration *int64` + `go build ./pkg/...` | **Off-disk retrieval** |
+| **A4** | impact analysis | list every file transitively calling `PrepareStep` (un-greppable by name) | — (in-repo call-graph) | recall ≥0.8 vs independent Go-SSA oracle (37 files) | **Deep call-graph traversal** |
 
-All three real bugfixes were verified red→green on 2026-06-26. A2 is kept constructed because a genuine cross-repo change does not land as one commit with one test suite (the coupling is service-level) — it is the graph discriminator: `engineVersion` is absent from cashbot-go (not greppable), so the agent must trace ai-server → cashbot-go.
+All three real bugfixes were verified red→green on 2026-06-26. The constructed tasks are the graph discriminators: A2/A3 hinge on a field absent from cashbot-go (not greppable, so the agent must trace ai-server → cashbot-go), and A3 additionally removes ai-server from disk so only a pre-built index can reach it; A4 needs transitive call-graph traversal.
+
+> **Canonical task definitions, verbatim prompts, and results** now live in [`../docs/03-task-runs.md`](../docs/03-task-runs.md) and [`tasks.jsonl`](tasks.jsonl). The walkthrough below covers the original R1/R2/R3/A2 subset; A3/A4 are defined in those two files.
 
 ## What we ask Claude (verbatim)
 
