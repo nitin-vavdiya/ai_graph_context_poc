@@ -54,21 +54,19 @@ The repo has two tiers: **research & decision** (why a code-context layer, which
 - [`docs/adr/0001-adopt-code-context-layer.md`](docs/adr/0001-adopt-code-context-layer.md) — decision to adopt a code-context layer; value vs delivery; permissive-OSS + measured-PoC constraints.
 - [`docs/adr/0002-poc-tool-selection-codegraphcontext-serena.md`](docs/adr/0002-poc-tool-selection-codegraphcontext-serena.md) — decision to take **CodeGraphContext + Serena** (plus a no-tool baseline) into the PoC.
 
-**PoC execution** — `poc/` (start at the hub)
+**PoC execution & results** — `poc/` (start at the hub)
 
-- [`poc/README.md`](poc/README.md) — **PoC hub**: phases, the 4 arms, how to run, and links to everything below.
-- [`poc/TEST-PLAN.md`](poc/TEST-PLAN.md) — test plan & measurement plan: arms, test cases, what we measure, and how we reach a verdict.
-- [`poc/REFERENCE.md`](poc/REFERENCE.md) — one-stop reference: commands, results schema, how to add tasks, file map, versions, gotchas.
-- [`poc/benchmark-design.md`](poc/benchmark-design.md) — Phase-0 enrichment + the 4-arm benchmark design (arms, oracle, isolation, gates).
-- [`poc/SETUP.md`](poc/SETUP.md) · [`poc/SETUP-REPORT.md`](poc/SETUP-REPORT.md) — setup runbook and as-built record.
-- [`poc/tasks/README.md`](poc/tasks/README.md) — the benchmark task corpus and scoring.
+- [`poc/README.md`](poc/README.md) — **PoC hub**: the 4 arms, how to run, and links to everything.
+- [`poc/docs/00-executive-summary.md`](poc/docs/00-executive-summary.md) — **★ the verdict** (one page).
+- [`poc/docs/03-task-runs.md`](poc/docs/03-task-runs.md) — task definitions + full 24-cell results matrix.
+- [`poc/docs/04-recommendation.md`](poc/docs/04-recommendation.md) — CGC vs Serena guidance.
+- [`poc/docs/01-multi-repo-setup-guide.md`](poc/docs/01-multi-repo-setup-guide.md) · [`poc/docs/02-poc-setup.md`](poc/docs/02-poc-setup.md) — setup (reusable, and as-built).
+- [`poc/PARITY-RECHECK.md`](poc/PARITY-RECHECK.md) — verification trail. Superseded docs: [`poc/_archive/`](poc/_archive/).
 
 ## Status
 
-Research-and-decision stage complete. **PoC tools finalized: CodeGraphContext + Serena**, measured against a plain-Claude-Code (no-tool) baseline (see ADR 0002).
+**POC complete** (single validated run, 2026-07-01). Tools benchmarked: CodeGraphContext (graph) + Serena (LSP) vs a plain-Claude-Code baseline.
 
-**Setup done + verified** (Python/TS/Go) — see [`poc/SETUP-REPORT.md`](poc/SETUP-REPORT.md).
+**Verdict (full detail in [`poc/docs/00-executive-summary.md`](poc/docs/00-executive-summary.md)):** graph context is a **narrow, conditional** capability, not the general "collapses the grep loop" win the framing above hypothesized. On ordinary on-disk tasks the model ignores the graph and LSP entirely (grep wins). The graph's one clean advantage is **retrieving code that isn't on disk** (another repo, not checked out) — which grep/LSP structurally cannot do — plus cheaper (if slightly less complete) deep call-graph traversal. No general token/cost saving; enterprise scale untested. The benefit table above states the *hypothesis*; the POC only partially confirmed it.
 
-**Phase 0 done** — cross-repo linkage. Indexing alone produced zero cross-repo edges (the real coupling is service-level, not in source); [`poc/enrich/enrich.py`](poc/enrich/enrich.py) loads the C4 `workspace.dsl` into the graph as repo-level `CALLS_SERVICE` edges, verified through Claude Code.
-
-**Next (Phase 1):** the 4-arm code-change benchmark (baseline / CGC / Serena / both) — design in [`poc/benchmark-design.md`](poc/benchmark-design.md). Tasks + runner are built; arm isolation is verified ([`poc/dryrun-isolation.sh`](poc/dryrun-isolation.sh), all arms pass). Runs are paced one task at a time; gated on per-repo test-suite buildability (§4.4), with ai-server's Detectron2/GPU deps the open risk.
+> The first head-to-head was found unreliable (Serena crippled to one repo, A3 isolation leak, circular A4 oracle) and **discarded**; the harness was fixed and re-run — see [`poc/PARITY-RECHECK.md`](poc/PARITY-RECHECK.md).

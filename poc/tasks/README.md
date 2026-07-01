@@ -1,6 +1,6 @@
 # Benchmark Task Definition
 
-What we run the 4 arms (baseline / CGC / Serena / both — see [`../benchmark-design.md`](../benchmark-design.md) §4.1) against. The corpus is **3 real historical bugfixes** replayed from `cashbot-go`'s git history, plus **1 constructed cross-repo task** (A2) for the graph thesis. Oracle = run the repo's own tests (design §4.4); isolation per design §4.5; metrics per [`../../docs/research/context-graph-evaluation.md`](../../docs/research/context-graph-evaluation.md) §3.6.
+What we run the 4 arms (baseline / CGC / Serena / both) against. The corpus is **3 real historical bugfixes** replayed from `cashbot-go`'s git history (R1–R3) plus **3 constructed tasks** for the graph thesis: A2 (cross-repo, both repos on disk), A3 (cross-repo, target repo parked off-disk), A4 (transitive impact set). Oracle = run the repo's own tests (R-tasks) or a build/completeness/recall check (A-tasks). Task definitions + results: [`../docs/03-task-runs.md`](../docs/03-task-runs.md); isolation: [`../docs/02-poc-setup.md`](../docs/02-poc-setup.md).
 
 ## Why real commits
 

@@ -1,5 +1,7 @@
 # Multi-Repo, Remote Deployment & Security — Operational Comparison of the Four Candidate Tools
 
+> **Pre-POC research (2026-06-26).** The POC is now complete; for measured findings see [`../../poc/docs/00-executive-summary.md`](../../poc/docs/00-executive-summary.md).
+
 **Date compiled:** 2026-06-26. **Tools:** CodeGraphContext, codegraph, code-review-graph, Serena. **Purpose:** the *value* these tools give an LLM coding agent is precise structural retrieval and impact analysis (see `context-graph-evaluation.md` §3.6); **this doc covers the separable second axis — how that knowledge is delivered to the agent** across ~100 repos. It compares multi-repo/unified-graph behaviour, cross-repo edges, remote MCP serving, security posture, storage location, and change pickup. Delivery affects *who benefits and how fresh the data is*, not the underlying help — so these are operational selection criteria, not the source of value.
 
 **Evidence labels:** *documented* = stated in project docs/README; *source* = read from the project's source code by a research agent; *inference* = analytical conclusion; *undetermined* = not confirmed. Tool-specific facts are cited inline. This is an operational companion to `context-graph-evaluation.md`; it does not repeat the conceptual foundation or maturity assessment.

@@ -1,6 +1,6 @@
 # Context Graphs for AI-Assisted Development at Enterprise Scale — Research & Decision-Support Report
 
-**Status:** Research-and-decision stage (hands-on PoC deferred). **Date compiled:** 2026-06-26. 
+**Status:** Pre-POC research (2026-06-26). The hands-on POC is now **complete** — for what the benchmark actually found (which qualifies several claims below), see [`../../poc/docs/00-executive-summary.md`](../../poc/docs/00-executive-summary.md). **Date compiled:** 2026-06-26. 
 
 **Scope:** ~100 repositories, billions of lines of code, agentic/AI-assisted development. 
 

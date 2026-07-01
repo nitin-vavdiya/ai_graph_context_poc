@@ -6,6 +6,8 @@
 - **Builds on:** ADR 0001
 - **Supersedes:** —
 
+> **Post-POC note (2026-07-01):** both tools were benchmarked. For this multi-repo purpose CodeGraphContext (graph) proved the better fit than Serena (LSP) — LSP structurally cannot do off-disk retrieval and has no one-shot transitive op — but neither beats grep on on-disk work. Head-to-head: [`../../poc/docs/04-recommendation.md`](../../poc/docs/04-recommendation.md). Decision above stands as written.
+
 ## Context
 
 ADR 0001 committed us to a permissive-OSS code-context layer, proven by a measured PoC. Research narrowed the field to a four-tool shortlist, all MIT-licensed (full analysis in `docs/research/context-graph-evaluation.md` §4–§8 and `docs/research/multi-repo-and-remote-deployment.md`):

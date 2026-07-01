@@ -6,7 +6,7 @@ Verification pass before discarding the old benchmark results and re-running. Go
 
 ## Why this recheck happened
 
-The original harness activated serena with `--project-from-cwd`, and every task ran from `groundx-rnd/cashbot-go`. That pinned serena to a **single repo** on every cell, so it never saw the other repos and could not compete with cgc's all-repo graph on any cross-repo task (A2/A3/A4). The head-to-head cells run under that config were tilted toward cgc **by construction** and are discarded. See the corrected serena setup in [`SETUP.md`](SETUP.md) §2b.
+The original harness activated serena with `--project-from-cwd`, and every task ran from `groundx-rnd/cashbot-go`. That pinned serena to a **single repo** on every cell, so it never saw the other repos and could not compete with cgc's all-repo graph on any cross-repo task (A2/A3/A4). The head-to-head cells run under that config were tilted toward cgc **by construction** and are discarded. See the corrected serena setup in [`docs/02-poc-setup.md`](docs/02-poc-setup.md).
 
 ## Setup fixes applied and verified
 

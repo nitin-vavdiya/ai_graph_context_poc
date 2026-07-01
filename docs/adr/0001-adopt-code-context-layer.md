@@ -5,6 +5,8 @@
 - **Deciders:** Nitin Vavdiya
 - **Supersedes:** —
 
+> **Post-POC note (2026-07-01):** the hands-on POC qualified this decision — the code-context layer's value is **narrow and conditional** (off-disk/cross-repo retrieval + deep traversal), not the general grep-loop win assumed here, and it delivered no general token/cost saving. Adopt selectively, not as a blanket layer. See [`../../poc/docs/00-executive-summary.md`](../../poc/docs/00-executive-summary.md) and [`../../poc/docs/04-recommendation.md`](../../poc/docs/04-recommendation.md). This note records the outcome; the decision above stands as written.
+
 ## Context
 
 We use LLM coding tools (Claude Code and similar) to make code changes across a large estate — roughly 100 repositories and billions of lines of code. Without help, an LLM agent making a change runs an expensive loop: grep → read a file → follow an import → read another → search again, re-deriving the codebase's structure every task by reading many files. This is where cost, time, and quality leak:

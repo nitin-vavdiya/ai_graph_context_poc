@@ -26,4 +26,4 @@ Research **graph context for AI coding tools** (Claude Code etc.) at enterprise 
 
 ## Status
 
-Init only. Research **not started** yet (per user).
+POC complete. CGC (graph) vs Serena (LSP) benchmarked over a 6-repo corpus. A parity recheck (2026-07-01) found the first head-to-head unreliable (serena scoping bug, A3 isolation leak, circular A4 oracle); the harness was fixed (Seatbelt sandbox, independent A4 oracle) and re-run. Findings live in `poc/docs/` (start with `00-executive-summary.md`). Raw evidence: `poc/results/`, `poc/runs/`, `poc/PARITY-RECHECK.md`.

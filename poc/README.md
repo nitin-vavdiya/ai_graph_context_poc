@@ -1,49 +1,50 @@
-# PoC — code-context tools for an LLM coding agent
+# PoC — Graph Context vs LSP for an AI Coding Agent
 
-> ▶ **Picking this back up?** Start at [`RESUME.md`](RESUME.md) — the exact next commands.
+Hands-on comparison of **CodeGraphContext** (code knowledge graph / Neo4j) and **Serena** (LSP) against a plain-Claude-Code **baseline**, measured on real code-change tasks over the 6-repo `groundx-rnd/` corpus.
 
-Hands-on validation of the two finalized tools (**CodeGraphContext** + **Serena**) against a plain-Claude-Code baseline, measured on real code-change tasks over the `groundx-rnd/` corpus. The *why* and tool selection live in [`../docs/research/`](../docs/research/) and the [ADRs](../docs/adr/); this folder is the *execution*.
+> **Status:** complete (single validated run, 2026-07-01). The first head-to-head was found unreliable and discarded; the harness was fixed and re-run — see [`PARITY-RECHECK.md`](PARITY-RECHECK.md).
 
-## Phases
+## Read the results — `docs/`
 
-| Phase | What | Status |
+| # | doc | what |
 |---|---|---|
-| **Setup** | Install + index the tools, wire them into Claude Code, verify | ✅ done — [`SETUP.md`](SETUP.md) (runbook) · [`SETUP-REPORT.md`](SETUP-REPORT.md) (as-built) |
-| **Phase 0** | Make the graph span repos (C4 service edges) | ✅ done — [`enrich/enrich.py`](enrich/enrich.py); see SETUP-REPORT §5b |
-| **Phase 1** | 4-arm code-change benchmark | design ready — [`benchmark-design.md`](benchmark-design.md); tasks + runner built, runs pending |
+| **0** | [`docs/00-executive-summary.md`](docs/00-executive-summary.md) | **★ start here** — one-page verdict |
+| 1 | [`docs/01-multi-repo-setup-guide.md`](docs/01-multi-repo-setup-guide.md) | reusable how-to: set up CGC + Serena for N repos |
+| 2 | [`docs/02-poc-setup.md`](docs/02-poc-setup.md) | how *this* POC was set up + the fairness fixes |
+| 3 | [`docs/03-task-runs.md`](docs/03-task-runs.md) | task definitions + full 24-cell results matrix |
+| 4 | [`docs/04-recommendation.md`](docs/04-recommendation.md) | CGC vs Serena — adopt/don't-adopt guidance |
 
-## Map
-
-- [`TEST-PLAN.md`](TEST-PLAN.md) — **test plan & measurement plan**: objective, hypothesis, the 4 arms, test cases, procedure, what we measure and how we reach a verdict, execution schedule, validity limits.
-- [`REFERENCE.md`](REFERENCE.md) — **one-stop reference**: command cheatsheet, arms + isolation, results/metrics schema, how to add a task, file map, versions, and gotchas.
-- [`CONCLUSIONS.md`](CONCLUSIONS.md) — **★ start here**: one-page synthesis — verdict, results, cost/quality matrices, methodology lessons, recommendation.
-- [`FINDINGS.md`](FINDINGS.md) — **running findings log**: the full evidence trail behind the conclusions (per-task, chronological).
-- [`benchmark-design.md`](benchmark-design.md) — the plan: Phase-0 enrichment + the 4-arm benchmark (arms, oracle, **isolation §4.5**, gates). **New to this? Start at §0 "In plain terms".**
-- [`SETUP.md`](SETUP.md) · [`SETUP-REPORT.md`](SETUP-REPORT.md) — reproducible setup runbook and the as-built record.
-- [`tasks/`](tasks/) — the benchmark task corpus ([`tasks/README.md`](tasks/README.md), [`tasks/tasks.jsonl`](tasks/tasks.jsonl), `tasks/fixtures/`).
-- `mcp/` — per-arm MCP configs: `codegraphcontext.json`, `serena.json`, `both.json` (baseline uses none).
-- `enrich/` — Phase-0 cross-repo enrichment.
-- `docker-compose.yml` — local Neo4j for CodeGraphContext.
-- `runs/` — per-task run reports (generated). `results/` — raw logs + CSV (gitignored).
+Supporting: [`PARITY-RECHECK.md`](PARITY-RECHECK.md) (verification trail — why the numbers are trustworthy). Superseded docs are in [`_archive/`](_archive/).
 
 ## The 4 arms (all use Claude's built-in tools; only the MCP config differs)
 
-| Arm | MCP | Config |
+| arm | MCP | config |
 |---|---|---|
 | baseline | none | — |
-| cgc | codegraphcontext only | `mcp/codegraphcontext.json` |
-| serena | serena only | `mcp/serena.json` |
+| cgc | codegraphcontext | `mcp/codegraphcontext.json` |
+| serena | serena | `mcp/serena.json` |
 | both | codegraphcontext + serena | `mcp/both.json` |
 
-Isolation is identical on every arm (`--strict-mcp-config --setting-sources project,local`, fresh process per cell) — spec in [`benchmark-design.md`](benchmark-design.md) §4.5, verified by `dryrun-isolation.sh`.
+Isolation is identical on every arm: a macOS Seatbelt sandbox (`--permission-mode dontAsk` + [`sandbox-settings.json`](sandbox-settings.json)) plus `--strict-mcp-config`, fresh process per cell — details in [`docs/02-poc-setup.md`](docs/02-poc-setup.md), verified by `dryrun-isolation.sh`.
 
-## How to run
+## Layout
+
+- `run.sh` — the benchmark runner (restore → run cell → oracle → restore).
+- `sandbox-settings.json` — the Seatbelt sandbox config applied to every cell.
+- `oracle/` — independent Go-SSA call-graph oracle for A4 ([`oracle/README.md`](oracle/README.md)).
+- `tasks/` — task corpus (`tasks.jsonl`, `fixtures/`).
+- `mcp/` — per-arm MCP configs.
+- `enrich/` — cross-repo C4 service edges for the graph.
+- `docker-compose.yml` — local Neo4j.
+- `runs/` — per-cell run reports (generated). `results/` — raw logs + CSV (gitignored).
+- `dryrun-isolation.sh` · `probe-mcp.sh` — pre-flight isolation + MCP-callability checks.
+
+## Run it
 
 ```bash
 docker compose -f poc/docker-compose.yml up -d     # Neo4j (cgc arm)
-bash poc/dryrun-isolation.sh                        # pre-flight: prove arm isolation (no benchmark)
-bash poc/run.sh --tasks C1                          # one task (its 4 arms); see results/results.csv + runs/C1.md
-bash poc/run.sh                                     # full matrix (4 tasks x 4 arms)
+serena project index <abs path>/groundx-rnd        # one-time Serena index (see docs/02)
+bash poc/dryrun-isolation.sh                        # pre-flight: MCP scoping + sandbox denial
+bash poc/run.sh --tasks A3 --arms baseline,cgc      # one task, chosen arms
+bash poc/run.sh                                     # full matrix (6 tasks x 4 arms)
 ```
-
-Runs are paced **one task at a time** (Claude rate limits) — order C1 → B1 → A1 → A2.

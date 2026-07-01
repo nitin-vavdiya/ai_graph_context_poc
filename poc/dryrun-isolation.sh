@@ -18,8 +18,15 @@
 #   --strict-mcp-config         only MCP servers from --mcp-config (none for baseline)
 #   --setting-sources project,local   omit the `user` source where claude-mem
 #                                      hook + plugins are registered
+#   --permission-mode dontAsk + --settings sandbox-settings.json
+#                                     macOS Seatbelt sandbox on Bash: network denied
+#                                     (blocks bolt:7687 + docker), reads denied outside
+#                                     the workspace (blocks poc/ answer fixtures + the
+#                                     stray log_analysis/ checkout). See PARITY-RECHECK.md.
 #   fresh process per run             no --continue/--resume (cold session)
-# Claude's BUILT-IN tools (grep/read/edit/bash) are available in ALL arms by design.
+# Claude's BUILT-IN tools (grep/read/edit/bash) are available in ALL arms WITHIN the
+# sandboxed workspace. This script checks (1) MCP-server scoping per arm and (2) that the
+# sandbox actually denies docker + out-of-workspace reads.
 #
 # Usage:  bash poc/dryrun-isolation.sh
 set -uo pipefail
@@ -28,7 +35,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNDIR="$ROOT/groundx-rnd/ai-server"   # any indexed repo; isolation is config-driven
 MCP="$ROOT/poc/mcp"
 COMMON=(--strict-mcp-config --setting-sources project,local
-        --permission-mode bypassPermissions --model claude-opus-4-8
+        --permission-mode dontAsk --settings "$ROOT/poc/sandbox-settings.json"
+        --allowedTools "Read,Grep,Glob,Bash,Edit,Write,TodoWrite,Task"
+        --model claude-opus-4-8
         --output-format stream-json --verbose --max-turns 1)
 TMP="$(mktemp -d)"
 
@@ -71,7 +80,25 @@ for row in "${ARMS[@]}"; do
   echo
 done
 
+# ---- (2) sandbox denial check: prove Bash cannot reach docker/neo4j or read fixtures ----
+echo "────────────────────────────────────────────────────────"
+echo "SANDBOX DENIAL CHECK (baseline arm, from workspace)"
+sbxlog="$TMP/sandbox.jsonl"
+GOPROXY=off GOTOOLCHAIN=local claude -p \
+  "Run each and report exit status, do not stop on failure: (1) Bash: docker ps  (2) Bash: cat $ROOT/poc/tasks/tasks.jsonl  (3) Bash: nc -zv localhost 7687" \
+  "${COMMON[@]}" > "$sbxlog" 2>"$TMP/sandbox.err"
+# Every sensitive action must be blocked; the transcript should show denials / 'not permitted'.
+blocked="$(jq -rs '[.[]|select(.type=="user")|.message.content[]?|select(.type=="tool_result")|.content|tostring]|join(" ")' "$sbxlog" 2>/dev/null | grep -oiE "denied|not permitted" | wc -l | tr -d ' ')"
+leaked="$(jq -rs '[.[]|select(.type=="user")|.message.content[]?|select(.type=="tool_result")|.content|tostring]|join(" ")' "$sbxlog" 2>/dev/null | grep -ciE "poctestpassword|\"id\": *\"A3\"|taskDuration")"
+if [ "${blocked:-0}" -ge 2 ] && [ "${leaked:-0}" -eq 0 ]; then
+  echo "  RESULT: PASS — docker/neo4j/fixtures all denied ($blocked denials, 0 leaks)"
+else
+  echo "  RESULT: FAIL — sandbox leak (denials=$blocked, leaked-content=$leaked) — INSPECT $sbxlog"
+  fail=$((fail+1))
+fi
+echo
+
 echo "========================================================"
-echo "Isolation dry-run: $pass passed, $fail failed."
+echo "Isolation dry-run: $pass passed, $fail failed  (MCP scoping + sandbox denial)."
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]

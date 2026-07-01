@@ -251,9 +251,10 @@ gen_run_doc() { # $1 = task index
     echo "- **Repos:** $reps · **run_dir:** \`$rdir\`"
     echo "- **Prompt:** $prm"
     echo
-    echo "## Isolation (identical on every arm — design §4.5, verified by \`poc/dryrun-isolation.sh\`)"
-    echo "- \`--strict-mcp-config\` (only the arm's own MCP) · \`--setting-sources project,local\` (no user-source claude-mem hook / plugins) · fresh \`claude -p\` per cell (no \`--continue\`/\`--resume\`)."
-    echo "- Claude **built-in** tools (grep/read/edit/bash) enabled on **all** arms. \`--add-dir\`: $reps."
+    echo "## Isolation (identical on every arm — verified 2026-07-01, see \`PARITY-RECHECK.md\`)"
+    echo "- **OS sandbox** (\`--permission-mode dontAsk\` + \`poc/sandbox-settings.json\`): macOS Seatbelt isolates every Bash subprocess — **network denied** (blocks \`bolt:7687\` + docker) and reads **denied outside the workspace** (blocks \`poc/\` answer fixtures + the stray \`log_analysis/\` checkout). \`dontAsk\` auto-denies any out-of-scope tool call with no prompt."
+    echo "- \`--strict-mcp-config\` (only the arm's own MCP) · \`--setting-sources project,local\` (no user-source claude-mem hook / plugins) · per-arm \`--allowedTools\` · \`GOPROXY=off GOTOOLCHAIN=local\` (offline go) · fresh \`claude -p\` per cell."
+    echo "- Claude **built-in** tools (grep/read/edit/bash) enabled on all arms **within the sandboxed workspace**. \`--add-dir\`: $reps. cgc/both reach Neo4j via their MCP **server** (not sandboxed); no arm's Bash can."
     echo
     echo "| Arm | MCP servers allowed | Forbidden |"
     echo "|---|---|---|"
