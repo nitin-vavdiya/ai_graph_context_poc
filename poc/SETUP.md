@@ -73,30 +73,51 @@ uv tool install -p 3.13 serena-agent
 serena --version          # 1.5.3 verified
 ```
 
-### 2b. Provision ALL corpus language servers up front (single step — don't discover gaps mid-run)
+### 2b. Scope Serena to ALL 6 corpus repos as ONE "monorepo" project — **not per-repo cwd**
 
-> **One Serena server handles all languages — you do NOT run one server per language.** The single Serena MCP server (`poc/mcp/serena.json`) internally spawns the right language server (pyright/tsserver/gopls) as a child process for whatever language(s) the active project contains, including multi-language repos. The "per-language" work below is only ensuring each language-server **binary** is available on the machine — not running extra servers. (Serena's genuine one-at-a-time limit is about *projects/repos*, not languages.)
+> **Corrected 2026-07-01 (supersedes the earlier `--project-from-cwd` setup).** The original config activated Serena from the current working directory (`--project-from-cwd`), which pinned it to a **single repo** (`cashbot-go`) on every run. That silently handicapped Serena on all cross-repo tasks — it never saw the other repos, so it could not compete with cgc's all-repo graph. The head-to-head cells run under that config are **not reliable** and were discarded. Fixed below.
 
-Front-load the binaries: enumerate the corpus languages first, then ensure each server before any use.
+Serena's documented multi-repo pattern is a **"monorepo folder"**: point one project at a parent folder that contains all the repos as sub-folders (oraios docs, [Workflow](https://oraios.github.io/serena/02-usage/040_workflow.html); [Discussion #542](https://github.com/oraios/serena/discussions/542) — "full monorepo support, you just need to set the languages in your project.yml"). Our parent is `groundx-rnd/`. This is the direct parallel to cgc's single graph over all repos, and makes Serena **cwd-independent** like cgc.
 
-Corpus languages = **Python, TypeScript/JS, Go**.
-- **Python, TypeScript/JS** — auto-provisioned by Serena on first activation (no action).
-- **Go** — requires a manual external `gopls` (Serena does not auto-manage it; without it Go symbol tools fail with `Found a Go version but gopls is not installed`):
+**Three load-bearing config pieces** (verified — omit any and Serena silently degrades):
+
+1. **`--project <abs parent>` + dashboard off + tool timeout** — in `poc/mcp/serena.json` / `both.json`:
+```jsonc
+"args": ["start-mcp-server", "--context", "claude-code",
+         "--project", "/Users/nitin/projects/groundx/ai_graph_context_poc/groundx-rnd",
+         "--tool-timeout", "300",
+         "--enable-web-dashboard", "false", "--open-web-dashboard", "false"]
+```
+**Critical — disable the web dashboard.** With it enabled (the default), the Claude Code MCP client intermittently fails with `MCP error -32000: Connection closed` ([serena #898](https://github.com/oraios/serena/issues/898)). This produced a spurious "serena timed out" reading in early testing. The `--enable-web-dashboard false` flag removes the confound.
+
+2. **`languages:` list in `groundx-rnd/.serena/project.yml`** — must be set **explicitly**:
+```yaml
+languages:
+- python
+- typescript
+- go
+```
+**Critical:** if `languages:` is left empty, Serena auto-infers a **single** language (it picked `typescript` here) and **silently returns `[]`** for Python/Go symbols — no error, `is_error: false`. Verified failure mode. Multiple languages run as parallel language servers (pyright/tsserver/gopls) under the one project.
+
+3. **`ignored_paths:` in the same `project.yml`** — scope to exactly the 6 corpus repos. The parent `groundx-rnd/` actually contains **27** dirs; without ignores, Serena indexes all of them (out-of-corpus repos, workspaces, PHP) — slower and a scope mismatch vs cgc (which indexed exactly 6). Ignore the 21 non-corpus dirs (`/eyelevel-wordpress/`, `/groundx-on-prem/`, `/workspace-*/`, … — see the file for the full list).
+
+**`gopls` binary still required** (external; Serena does not auto-manage Go):
 ```bash
 go install golang.org/x/tools/gopls@latest      # installs to $(go env GOPATH)/bin
 command -v gopls                                 # must be on PATH (e.g. ~/go/bin)
 ```
-Optional one-shot warm-up (downloads the auto servers now instead of during a timed run) — activate one project per language once:
-```bash
-for d in ai-server groundx-typescript cashbot-go; do
-  ( cd "groundx-rnd/$d" && claude -p "Use serena get_symbols_overview on one file." \
-      --mcp-config /Users/nitin/projects/groundx/ai_graph_context_poc/poc/mcp/serena.json \
-      --strict-mcp-config --permission-mode bypassPermissions --model claude-opus-4-8 >/dev/null 2>&1 )
-done
-```
-> Contrast: **CodeGraphContext needs none of this** — `tree-sitter-language-pack` covers all 23 languages in the single install from §1b. The per-language server burden is unique to Serena and grows with language diversity (a real operational factor at ~100 repos).
 
-Verified language coverage (6-repo corpus): Python ✓, TypeScript/JS ✓, Go ✓ for **both** tools.
+**Mandatory one-time index (warm-up) — budget ~15 min:**
+```bash
+serena project index /Users/nitin/projects/groundx/ai_graph_context_poc/groundx-rnd
+```
+The index is a symbol cache; run it **once** before any timed run (Serena auto-updates it on file changes afterward). It is **slow at multi-repo scale, and gopls is the bottleneck**: verified 2026-07-01, the first ~45% (Python + TypeScript, 1079/2378 files) indexed at ~3540 files/s in under a second, then the **Go half collapsed to ~1.3 files/s** — a ~2600× throughput drop — taking ~13 of the ~15 total minutes. This one-time cost matches Serena's own note that "each workspace folder adds startup/index time" and issues [#308](https://github.com/oraios/serena/issues/308)/[#876](https://github.com/oraios/serena/issues/876). It is a **warm-up cost, not a per-query cost** (see verification below).
+
+> Contrast: **CodeGraphContext needs none of the per-language / dashboard / project-scoping ceremony** — `tree-sitter-language-pack` covers all 23 languages in the single install from §1b, and the graph is cwd-independent by construction. Serena's setup burden (per-language LSP binaries, explicit `languages`, dashboard confound, slow gopls index, one-project-at-a-time) is a real operational factor at ~100 repos.
+
+**Verified capability (2026-07-01, post-index, dashboard off):** a **single unscoped** `find_symbol` whole-project search resolved `DocumentResponse`, `Response`, and `PrepareStep` in **~36 s**, spanning **3 languages across 4 repos** (ai-server + groundx-python Python, dashboard + groundx-typescript TS, cashbot-go Go). Serena is genuinely multi-repo/multi-language for **symbol lookup** — parity with cgc. Earlier "unscoped search times out" readings were **artifacts of a cold/incomplete index + the dashboard bug**, not a Serena scaling limit; retracted.
+
+**Verified capability LIMIT (from oraios docs):** cross-workspace-folder **reference / caller discovery is TypeScript-only** today — other language servers error if that setting is used. So Serena can *find* Go/Python symbols across repos, but **cannot trace cross-repo callers/references for Go/Python**. This is the genuine remaining Serena vs. cgc gap on A4-style transitive cross-repo call tracing (cgc's `CALLS*` closure has no such per-language restriction).
 
 ## 3. Verify both work with Claude Code (headless smoke test)
 
@@ -109,16 +130,15 @@ claude -p "Use ONLY the codegraphcontext MCP tools. List 3 functions in ai-serve
   --permission-mode bypassPermissions --model claude-opus-4-8 \
   --output-format json | jq -r '.is_error, .result'
 
-# Serena — run from inside the repo (so --project-from-cwd activates it)
-cd groundx-rnd/ai-server
-claude -p "Use ONLY the serena MCP tools to find one function/class definition and its file. Be brief." \
+# Serena — project is the parent monorepo folder (cwd-independent). Run the index FIRST (§2b).
+# This unscoped query must resolve symbols from MULTIPLE repos/languages — the multi-repo check.
+claude -p "Use ONLY the serena MCP tools. Unscoped find_symbol for DocumentResponse (Python), Response (Go), PrepareStep (Go). Report file paths. Be brief." \
   --mcp-config /Users/nitin/projects/groundx/ai_graph_context_poc/poc/mcp/serena.json --strict-mcp-config \
   --permission-mode bypassPermissions --model claude-opus-4-8 \
   --output-format json | jq -r '.is_error, .result'
-cd ../..
 ```
 
-**Pass criteria (both verified 2026-06-26):** `is_error == false` and the `result` shows the tool actually returned symbols/relationships (not a grep fallback). CodeGraphContext returned a real CALLS edge; Serena located `detectLayout` in `document/tasks/detect_layout.py`.
+**Pass criteria:** `is_error == false` and the `result` shows the tool returned real symbols/relationships (not a grep fallback). CodeGraphContext (verified 2026-06-26) returned a real CALLS edge. Serena (verified 2026-07-01, post-index, dashboard off) resolved symbols across **3 languages / 4 repos** in one unscoped query (~36 s) — the multi-repo capability check. **Both arms must operate over all 6 corpus repos before any scored run** — a single-repo Serena scope invalidates every cross-repo cell.
 
 ## 4. Teardown / reset
 ```bash

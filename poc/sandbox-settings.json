@@ -1,0 +1,17 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "network": { "deniedDomains": ["*"] },
+    "filesystem": {
+      "allowWrite": [".", "/Users/nitin/Library/Caches/go-build", "/private/tmp", "/tmp"],
+      "denyRead": [
+        "/Users/nitin/projects/groundx/ai_graph_context_poc/poc",
+        "/Users/nitin/projects/groundx/log_analysis"
+      ]
+    }
+  },
+  "permissions": {
+    "deny": ["Bash(docker *)", "Bash(docker)"]
+  }
+}

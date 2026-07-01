@@ -14,7 +14,14 @@
     "serena": {
       "type": "stdio",
       "command": "serena",
-      "args": ["start-mcp-server", "--context", "claude-code", "--project-from-cwd"]
+      "args": [
+        "start-mcp-server",
+        "--context", "claude-code",
+        "--project", "/Users/nitin/projects/groundx/ai_graph_context_poc/groundx-rnd",
+        "--tool-timeout", "300",
+        "--enable-web-dashboard", "false",
+        "--open-web-dashboard", "false"
+      ]
     }
   }
 }

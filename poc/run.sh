@@ -37,10 +37,29 @@ OUT="$ROOT/poc/results"
 RUNS="$ROOT/poc/runs"
 MODEL="claude-opus-4-8"
 MAXTURNS=80
-ISO=(--strict-mcp-config --setting-sources project,local --permission-mode bypassPermissions --model "$MODEL")
+# ISOLATION (verified 2026-07-01 — see PARITY-RECHECK.md):
+#   dontAsk           auto-DENY any tool call outside the allow-set, no prompt (headless-safe)
+#   --settings sandbox-settings.json   OS-level Seatbelt sandbox on Bash: network DENIED (blocks
+#                     bolt:7687 + docker), reads DENIED outside workspace (blocks poc/ answer
+#                     fixtures + the stray log_analysis/ai-server checkout)
+#   --strict-mcp-config   only the arm's own MCP servers
+#   --setting-sources project,local   no user-source claude-mem hook/plugins
+# The cgc/both arms still reach Neo4j via their MCP SERVER (launched by claude, NOT sandboxed);
+# only the agent's Bash is network-isolated — so non-graph arms genuinely cannot touch the graph.
+# GOPROXY=off/GOTOOLCHAIN=local: go build/test must work offline (network denied); modules are cached.
+ISO=(--strict-mcp-config --setting-sources project,local --permission-mode dontAsk \
+     --settings "$ROOT/poc/sandbox-settings.json" --model "$MODEL")
+BASE_ALLOW="Read,Grep,Glob,Bash,Edit,Write,TodoWrite,Task"
 
 ARM_NAMES=(baseline cgc serena both)
 arm_mcp() { case "$1" in baseline) echo "" ;; cgc) echo "$MCP/codegraphcontext.json" ;; serena) echo "$MCP/serena.json" ;; both) echo "$MCP/both.json" ;; esac; }
+# dontAsk requires MCP tools to be explicitly allowed, else they are auto-denied.
+arm_allow() { case "$1" in
+  baseline) echo "$BASE_ALLOW" ;;
+  cgc)      echo "$BASE_ALLOW,mcp__codegraphcontext" ;;
+  serena)   echo "$BASE_ALLOW,mcp__serena" ;;
+  both)     echo "$BASE_ALLOW,mcp__codegraphcontext,mcp__serena" ;;
+esac; }
 
 DRY=0; ONLY_TASKS=""; ONLY_ARMS=""
 while [ $# -gt 0 ]; do case "$1" in
@@ -160,13 +179,19 @@ oracle() { # sets globals ORACLE_PASS, COMPLETENESS, NOTE
       ( cd "$cg" && go build ./pkg/... >/dev/null 2>&1 ) && [ "$COMPLETENESS" = 1 ] && ORACLE_PASS=1
       NOTE="taskDuration_ptr_field=$COMPLETENESS" ;;
     A4)
-      # impact analysis. PASS gates on RECALL of the ground-truth (graph-closure)
-      # caller files >=0.8. PRECISION is computed and reported as a DIAGNOSTIC only,
-      # NOT gated: the ground truth is the graph's *static* CALLS closure, which
-      # (a) misses dynamic dispatch (interface/func-value calls an agent may still
-      # find) and (b) is circular-favoring cgc — so penalizing "extra" files would
-      # be unfair. Precision is extracted from list-only lines (the requested format).
-      local gt="$ROOT/poc/tasks/fixtures/A4_impact_files.txt" ans total found fp pred predn bad
+      # impact analysis. PASS gates on RECALL of the ground-truth caller files >=0.8.
+      # GROUND TRUTH IS NOW COMPILER-DERIVED (independent of any tool under test):
+      # poc/oracle/ builds it via Go SSA static call-graph (ALGO=static WITH_TESTS=1),
+      # reverse-reachability to the concrete summarizer.Process.PrepareStep -> 37 files.
+      # This REPLACES the old A4_impact_files.txt, which was the Neo4j CALLS* closure =
+      # cgc's OWN output (circular) AND incomplete (missed 8 files the compiler finds).
+      # See PARITY-RECHECK.md "Blocker 2". The static set is a sound lower bound (every
+      # file provably contains a static-dispatch transitive caller); dynamic-dispatch-only
+      # callers are out of scope by design. PRECISION stays a DIAGNOSTIC (not gated):
+      # dynamic dispatch means an agent may legitimately find extra reachable files.
+      # The DEFENSIBLE headline for A4 is the EFFICIENCY contrast (tool_calls / num_turns /
+      # duration / cost), already recorded per cell — not the recall score alone.
+      local gt="$ROOT/poc/tasks/fixtures/A4_impact_files.static-ssa.txt" ans total found fp pred predn bad
       ans=$(jq -rs '[.[]|select(.type=="result")|.result]|last // ""' "$log" 2>/dev/null)
       total=$(grep -c . "$gt"); found=0
       while IFS= read -r fp; do [ -z "$fp" ] && continue
@@ -270,7 +295,9 @@ gen_run_doc() { # $1 = task index
 # ---- main loop --------------------------------------------------------------
 snapshot_repo "$RND/cashbot-go"
 snapshot_repo "$RND/ai-server"
-trap 'unhide_git; unpark_all; restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"' EXIT
+# EXIT alone does NOT fire on SIGTERM/SIGINT — a killed/interrupted run would then leave
+# cashbot-go/.git hidden and repos parked, corrupting the NEXT run. Trap the signals too.
+trap 'unhide_git; unpark_all; restore_repo "$RND/cashbot-go"; restore_repo "$RND/ai-server"' EXIT INT TERM
 
 NTASK=$(jq -s 'length' "$TASKS")
 echo "Runner: $NTASK tasks x ${#ARM_NAMES[@]} arms  (dry=$DRY)"; echo
@@ -312,7 +339,8 @@ for i in $(seq 0 $((NTASK-1))); do
     else
       mcp="$(arm_mcp "$arm")"; mcpflag=(); [ -n "$mcp" ] && mcpflag=(--mcp-config "$mcp")
       hide_git "$RND/cashbot-go"   # no VCS recovery while the agent runs (anti-gaming)
-      ( cd "$RND/$(basename "$run_dir")" && claude -p "$prompt" "${ISO[@]}" "${mcpflag[@]}" "${add[@]}" \
+      ( cd "$RND/$(basename "$run_dir")" && GOPROXY=off GOTOOLCHAIN=local \
+          claude -p "$prompt" "${ISO[@]}" --allowedTools "$(arm_allow "$arm")" "${mcpflag[@]}" "${add[@]}" \
           --output-format stream-json --verbose --max-turns "$MAXTURNS" ) > "$log" 2> "$cell.err"
       unhide_git
       parse_metrics "$log"
